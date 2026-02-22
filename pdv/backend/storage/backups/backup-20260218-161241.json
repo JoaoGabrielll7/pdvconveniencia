@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "createdAt": "2026-02-18T16:12:41.845Z",
+  "data": {
+    "users": [
+      {
+        "id": "df2f1340-83ee-40a7-a308-27c3f5f1ad8e",
+        "nome": "Operador de Caixa",
+        "email": "caixa@conveniencia.com",
+        "senhaHash": "$2b$12$2.8klOj0arhte3n.Z5VoW.ejvCwHdfR8kgdYfmb9dQXO5W2LH.TGm",
+        "role": "CAIXA",
+        "ativo": true,
+        "tentativasLogin": 0,
+        "bloqueadoAte": null,
+        "ultimoLogin": "2026-02-17T23:23:56.451Z",
+        "criadoEm": "2026-02-17T19:54:08.624Z",
+        "updatedAt": "2026-02-18T11:26:55.420Z"
+      },
+      {
+        "id": "7b2c9988-6c8e-4961-9877-52c138b4a61d",
+        "nome": "Administrador",
+        "email": "admin@conveniencia.com",
+        "senhaHash": "$2b$12$GGB3ug/pg/45ggBaqBvMdezdnaWLZCOH4xBr07ow0TWkzFufKc/.6",
+        "role": "ADMIN",
+        "ativo": true,
+        "tentativasLogin": 0,
+        "bloqueadoAte": null,
+        "ultimoLogin": "2026-02-18T16:12:41.819Z",
+        "criadoEm": "2026-02-17T19:54:08.615Z",
+        "updatedAt": "2026-02-18T16:12:41.820Z"
+      }
+    ],
+    "categorias": [
+      {
+        "id": "1002506a-974b-46be-a05a-73696256ca00",
+        "nome": "Bebidas",
+        "createdAt": "2026-02-17T19:54:08.628Z"
+      },
+      {
+        "id": "05c089ce-ba1b-4393-a7ef-8bca6fd66cc4",
+        "nome": "Snacks",
+        "createdAt": "2026-02-17T19:54:08.637Z"
+      }
+    ],
+    "fornecedores": [
+      {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "nome": "Distribuidora Central",
+        "cnpj": "12.345.678/0001-90",
+        "email": "contato@distribuidoracentral.com",
+        "telefone": "(11) 3333-4444",
+        "endereco": "Rua das Industrias, 100",
+        "createdAt": "2026-02-17T19:54:08.645Z",
+        "updatedAt": "2026-02-17T19:54:08.645Z"
+      }
+    ],
+    "produtos": [],
+    "caixas": [],
+    "movimentos": [],
+    "vendas": [],
+    "itens": [],
+    "pagamentos": []
+  }
+}

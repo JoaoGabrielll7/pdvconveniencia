@@ -1,0 +1,18 @@
+[
+  {
+    "id": "02934fce-0202-4e05-ac4e-5519d4974bc9",
+    "key": "LIC-DBD6D06797",
+    "owner": "Sistema de Vendas",
+    "status": "ATIVA",
+    "createdAt": "2026-02-18T16:12:52.089Z",
+    "expiresAt": "2026-03-20T16:12:52.089Z"
+  },
+  {
+    "id": "0064168d-e187-442e-b2df-9b5237de6624",
+    "key": "LIC-972DECA2BB",
+    "owner": "Sistema PDV",
+    "status": "EXPIRADA",
+    "createdAt": "2026-02-18T16:12:04.719Z",
+    "expiresAt": "2026-03-20T16:12:04.719Z"
+  }
+]

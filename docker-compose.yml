@@ -1,0 +1,60 @@
+# PDV Conveniência - Banco, Backend e Frontend
+# Na pasta do projeto: docker-compose up -d
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: conveniencia_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: conveniencia_db
+      POSTGRES_USER: conveniencia_user
+      POSTGRES_PASSWORD: conveniencia_pass
+      PGTZ: America/Sao_Paulo
+    ports:
+      - "5432:5432"
+    volumes:
+      - conveniencia_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U conveniencia_user -d conveniencia_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./pdv/backend
+      dockerfile: Dockerfile
+    container_name: conveniencia_backend
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: postgresql://conveniencia_user:conveniencia_pass@postgres:5432/conveniencia_db
+      CORS_ORIGIN: http://localhost
+      JWT_SECRET: conveniencia-jwt-secret
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./pdv/vite-project
+      dockerfile: Dockerfile
+    container_name: conveniencia_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  conveniencia_postgres_data:
