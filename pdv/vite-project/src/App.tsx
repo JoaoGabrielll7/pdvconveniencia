@@ -2917,7 +2917,11 @@ function App() {
                         </div>
                         <div>
                           <label>Tipo pessoa</label>
-                          <select value={profileTipoPessoa} onChange={(event) => setProfileTipoPessoa(event.target.value as 'PF' | 'PJ')}>
+                          <select
+                            className="profile-type-select"
+                            value={profileTipoPessoa}
+                            onChange={(event) => setProfileTipoPessoa(event.target.value as 'PF' | 'PJ')}
+                          >
                             <option value="PF">PF</option>
                             <option value="PJ">PJ</option>
                           </select>

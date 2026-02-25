@@ -2306,6 +2306,43 @@
 .profile-system-edit-grid input,
 .profile-system-edit-grid select {
   min-height: 42px;
+  width: 100%;
+  border-radius: 0.6rem;
+  border: 1px solid #5c7db7;
+  background: #1a2d4c;
+  color: #eef5ff;
+  padding: 0.55rem 0.72rem;
+  font-weight: 600;
+}
+
+.profile-system-edit-grid input:focus,
+.profile-system-edit-grid select:focus {
+  outline: none;
+  border-color: #78a9ff;
+  box-shadow: 0 0 0 3px rgba(80, 132, 232, 0.2);
+  background: #1c3153;
+}
+
+.profile-system-edit-grid input[readonly] {
+  opacity: 0.9;
+  cursor: not-allowed;
+}
+
+.profile-type-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.2rem !important;
+  background-image: linear-gradient(180deg, transparent, transparent),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23d7e6ff' d='M1.4 1.2a.9.9 0 0 1 1.2 0L6 4.6l3.4-3.4a.9.9 0 1 1 1.2 1.2L6.6 6.4a.9.9 0 0 1-1.2 0L1.4 2.4a.9.9 0 0 1 0-1.2z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.78rem center;
+  background-size: 12px 8px;
+}
+
+.profile-type-select option {
+  background: #13213a;
+  color: #eef5ff;
 }
 
 @media (max-width: 980px) {
