@@ -119,6 +119,12 @@ type BackupData = {
     autoPrint: boolean;
   };
 };
+type ProfileMetadata = {
+  celular: string;
+  dataNascimento: string;
+  documento: string;
+  tipoPessoa: 'PF' | 'PJ';
+};
 
 // Sessao: utilitarios globais de formato, data e persistencia local.
 const normalizeApiBase = (raw?: string): string => {
@@ -164,6 +170,7 @@ const loadJson = <T,>(k: string, f: T): T => {
 };
 const BACKUP_STORAGE_KEY = 'pdv_backups';
 const ACCOUNT_SETTINGS_KEY = 'pdv_account_settings';
+const PROFILE_META_KEY = 'pdv_profile_meta';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
   startView: 'dashboard',
@@ -414,6 +421,10 @@ function App() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [profileNome, setProfileNome] = useState('');
   const [profileEmail, setProfileEmail] = useState('');
+  const [profileCelular, setProfileCelular] = useState('');
+  const [profileDataNascimento, setProfileDataNascimento] = useState('');
+  const [profileDocumento, setProfileDocumento] = useState('');
+  const [profileTipoPessoa, setProfileTipoPessoa] = useState<'PF' | 'PJ'>('PF');
   const [currentSenha, setCurrentSenha] = useState('');
   const [newSenha, setNewSenha] = useState('');
   const [accountStartView, setAccountStartView] = useState<AccountStartView>('dashboard');
@@ -1008,9 +1019,16 @@ function App() {
   
   useEffect(() => {
     if (!user) return;
+    const profileMetaMap = loadJson<Record<string, ProfileMetadata>>(PROFILE_META_KEY, {});
+    const fromMeta = profileMetaMap[user.id];
+    const fromUsuario = usuarios.find((item) => item.id === user.id);
     setProfileNome(user.nome || (user.role === 'ADMIN' ? 'Administrador' : 'Operador'));
     setProfileEmail(user.email || '');
-  }, [user]);
+    setProfileCelular(fromUsuario?.celular ?? fromMeta?.celular ?? '');
+    setProfileDataNascimento(fromUsuario?.dataNascimento ?? fromMeta?.dataNascimento ?? '');
+    setProfileDocumento(fromUsuario?.documento ?? fromMeta?.documento ?? '');
+    setProfileTipoPessoa(fromUsuario?.tipoPessoa ?? fromMeta?.tipoPessoa ?? 'PF');
+  }, [user, usuarios]);
 
   useEffect(() => {
     if (!isAdmin && accountStartView === 'dashboard') setAccountStartView('venda');
@@ -2017,6 +2035,32 @@ function App() {
       });
       if (!res.ok || !json.success) throw new Error(json.message ?? 'Falha ao atualizar perfil');
       setUser(json.data);
+      if (json.data.id) {
+        const profileMetaMap = loadJson<Record<string, ProfileMetadata>>(PROFILE_META_KEY, {});
+        profileMetaMap[json.data.id] = {
+          celular: profileCelular.trim(),
+          dataNascimento: profileDataNascimento,
+          documento: profileDocumento.trim(),
+          tipoPessoa: profileTipoPessoa,
+        };
+        saveJson(PROFILE_META_KEY, profileMetaMap);
+      }
+      setUsuarios((prev) =>
+        prev.map((item) =>
+          item.id === json.data.id
+            ? {
+                ...item,
+                nome: profileNome.trim(),
+                email: profileEmail.trim(),
+                celular: profileCelular.trim(),
+                dataNascimento: profileDataNascimento,
+                documento: profileDocumento.trim(),
+                tipoPessoa: profileTipoPessoa,
+              }
+            : item
+        )
+      );
+      setEditingProfileInfo(false);
       setStatus('Perfil atualizado com sucesso');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao atualizar perfil');
@@ -2837,7 +2881,7 @@ function App() {
                     </div>
                     <div className="profile-system-lines">
                       <p><span className="tag"><FontAwesomeIcon icon={faHashtag} /></span>{profileHandle}</p>
-                      <p><span className="tag"><FontAwesomeIcon icon={faPhone} /></span>(35) 99871-3472</p>
+                      <p><span className="tag"><FontAwesomeIcon icon={faPhone} /></span>{profileCelular || '(--)'}</p>
                       <p><span className="tag"><FontAwesomeIcon icon={faEnvelope} /></span>{profileEmail || 'admin@gmail.com'}</p>
                     </div>
                     <button type="button" className="profile-system-edit" onClick={() => setEditingProfileInfo((current) => !current)}>
@@ -2846,10 +2890,43 @@ function App() {
                   </div>
                   {editingProfileInfo && (
                     <div className="profile-system-edit-form">
-                      <label>Nome</label>
-                      <input value={profileNome} onChange={(event) => setProfileNome(event.target.value)} />
-                      <label>E-mail</label>
-                      <input value={profileEmail} onChange={(event) => setProfileEmail(event.target.value)} />
+                      <div className="profile-system-edit-grid">
+                        <div>
+                          <label>Nome *</label>
+                          <input value={profileNome} onChange={(event) => setProfileNome(event.target.value)} />
+                        </div>
+                        <div>
+                          <label>Celular</label>
+                          <input value={profileCelular} onChange={(event) => setProfileCelular(event.target.value)} placeholder="Inserir o celular" />
+                        </div>
+                        <div>
+                          <label>E-mail *</label>
+                          <input value={profileEmail} onChange={(event) => setProfileEmail(event.target.value)} />
+                        </div>
+                        <div>
+                          <label>Data de nascimento</label>
+                          <input type="date" value={profileDataNascimento} onChange={(event) => setProfileDataNascimento(event.target.value)} />
+                        </div>
+                        <div>
+                          <label>{profileTipoPessoa === 'PF' ? 'CPF' : 'CNPJ'}</label>
+                          <input
+                            value={profileDocumento}
+                            onChange={(event) => setProfileDocumento(event.target.value)}
+                            placeholder={profileTipoPessoa === 'PF' ? 'Informe o CPF' : 'Informe o CNPJ'}
+                          />
+                        </div>
+                        <div>
+                          <label>Tipo pessoa</label>
+                          <select value={profileTipoPessoa} onChange={(event) => setProfileTipoPessoa(event.target.value as 'PF' | 'PJ')}>
+                            <option value="PF">PF</option>
+                            <option value="PJ">PJ</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label>Nível de acesso</label>
+                          <input value={user?.role === 'ADMIN' ? 'Administrador' : 'Funcionário'} readOnly />
+                        </div>
+                      </div>
                       <div className="cash-modal-actions">
                         <button type="button" onClick={() => setEditingProfileInfo(false)}>Cancelar</button>
                         <button type="button" onClick={() => void saveProfile()} disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</button>

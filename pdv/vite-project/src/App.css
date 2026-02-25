@@ -2283,7 +2283,35 @@
   border-top: 1px solid #2f476f;
   padding-top: 0.6rem;
   display: grid;
-  gap: 0.35rem;
+  gap: 0.55rem;
+}
+
+.profile-system-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 0.55rem 0.7rem;
+}
+
+.profile-system-edit-grid > div {
+  display: grid;
+  gap: 0.26rem;
+}
+
+.profile-system-edit-grid label {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #e7efff;
+}
+
+.profile-system-edit-grid input,
+.profile-system-edit-grid select {
+  min-height: 42px;
+}
+
+@media (max-width: 980px) {
+  .profile-system-edit-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 980px) {
