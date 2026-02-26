@@ -1,0 +1,109 @@
+﻿@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap");
+:root {
+  font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.45;
+  font-weight: 400;
+  --bg-primary: #0f172a;
+  --bg-secondary: #18233a;
+  --bg-card: #1f2b44;
+  --text-primary: #ecf5ff;
+  --text-secondary: #a8bfdc;
+  --border-color: #334a75;
+  --primary-color: #3d72ff;
+  --line: rgba(167, 191, 227, 0.25);
+  --panel-bg: rgba(16, 24, 45, 0.85);
+  --mute: #a4b7ce;
+  --elev: 0 12px 32px rgba(6, 10, 20, 0.35);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark-mode {
+  --bg-primary: #0f172a;
+  --bg-secondary: #18233a;
+  --bg-card: #1f2b44;
+  --text-primary: #ecf5ff;
+  --text-secondary: #a8bfdc;
+  --border-color: #334a75;
+  --primary-color: #3d72ff;
+  --line: rgba(167, 191, 227, 0.25);
+  --panel-bg: rgba(16, 24, 45, 0.85);
+}
+
+.light-mode {
+  --bg-primary: #f5f7fa;
+  --bg-secondary: #FFFFFF;
+  --bg-card: #ffffff;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --border-color: #E5E7EB;
+  --primary-color: #2563EB;
+  --line: rgba(90, 108, 142, 0.22);
+  --panel-bg: #ffffff;
+  --elev: 0 10px 28px rgba(25, 34, 56, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+#root {
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+input,
+button {
+  font: inherit;
+}
+
+input {
+  width: 100%;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.65rem;
+}
+
+input:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 1px;
+}
+
+button {
+  border: 1px solid color-mix(in srgb, var(--primary-color) 45%, transparent);
+  border-radius: 0.6rem;
+  background: linear-gradient(130deg, color-mix(in srgb, var(--primary-color) 82%, #0f8ea2), color-mix(in srgb, var(--primary-color) 68%, #20ad8a));
+  color: white;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+
