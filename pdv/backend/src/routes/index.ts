@@ -16,6 +16,16 @@ router.get('/health', (_req, res) => {
   res.json({ success: true, message: 'API Conveniência OK' });
 });
 
+/** Status da configuração (sem expor valores) - para página de verificação de erro */
+router.get('/health/config', (_req, res) => {
+  res.json({
+    jwtSecretSet: Boolean(process.env.JWT_SECRET),
+    databaseUrlSet: Boolean(process.env.DATABASE_URL),
+    directUrlSet: Boolean(process.env.DIRECT_URL),
+    nodeEnv: process.env.NODE_ENV || 'development',
+  });
+});
+
 /** Verifica conexão com o banco de dados - use para debug/deploy (ex: Vercel) */
 router.get('/health/db', async (_req, res) => {
   const start = Date.now();
