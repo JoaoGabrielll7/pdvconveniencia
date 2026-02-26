@@ -27,6 +27,16 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '1mb' }));
 
+/** Raiz: evita "Cannot GET /" e indica rotas úteis */
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'PDV Conveniência API',
+    health: '/api/health',
+    dbCheck: '/api/health/db',
+    dbCheckPage: '/db-check',
+  });
+});
+
 /** Página simples para verificar conexão com o banco (útil em deploy, ex: Vercel) */
 app.get('/db-check', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
