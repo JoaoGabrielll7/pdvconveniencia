@@ -39,7 +39,13 @@ export function errorHandler(
     return;
   }
 
-  // Erro genérico (não expor detalhes em produção)
+  // Erro genérico (não expor detalhes em produção); sempre logar para debug (ex: Vercel Function logs)
+  if (err instanceof Error) {
+    console.error('[API 500]', err.message, err.stack);
+  } else {
+    console.error('[API 500]', err);
+  }
+
   const message =
     env.nodeEnv === 'production'
       ? 'Erro interno do servidor'

@@ -1,14 +1,17 @@
 import dotenv from 'dotenv';
 import path from 'node:path';
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Em produção (ex: Vercel) não existe .env no deploy; usar só process.env
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+}
 
 export const env = {
   port: Number(process.env.PORT) || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
   databaseUrl: process.env.DATABASE_URL ?? '',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  jwtSecret: process.env.JWT_SECRET ?? 'conveniencia-secret-dev',
+  jwtSecret: process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'production' ? '' : 'conveniencia-secret-dev'),
   accessTokenTtlMinutes: Number(process.env.ACCESS_TOKEN_TTL_MINUTES) || 15,
   refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS) || 7,
   loginMaxAttempts: Number(process.env.LOGIN_MAX_ATTEMPTS) || 5,

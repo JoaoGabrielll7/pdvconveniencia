@@ -27,6 +27,9 @@ export function hashToken(token: string): string {
 }
 
 export function signAccessToken(payload: { userId: string; role: Role }): { token: string; jti: string; exp: Date } {
+  if (!env.jwtSecret) {
+    throw new Error('JWT_SECRET nao definido. Configure em Vercel > Settings > Environment Variables.');
+  }
   const jti = crypto.randomUUID();
   const expiresIn = env.accessTokenTtlMinutes * 60;
   const token = jwt.sign(
