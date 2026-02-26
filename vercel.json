@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "pdv/vite-project/dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/db-check", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
