@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { prisma } from '../config/database';
 import { authRoutes } from './auth.routes';
 import { categoriaRoutes } from './categoria.routes';
 import { fornecedorRoutes } from './fornecedor.routes';
@@ -13,6 +14,29 @@ const router = Router();
 
 router.get('/health', (_req, res) => {
   res.json({ success: true, message: 'API Conveniência OK' });
+});
+
+/** Verifica conexão com o banco de dados - use para debug/deploy (ex: Vercel) */
+router.get('/health/db', async (_req, res) => {
+  const start = Date.now();
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    const latencyMs = Date.now() - start;
+    res.json({
+      success: true,
+      database: 'connected',
+      latencyMs,
+      message: 'Conexão com o banco de dados OK',
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro desconhecido';
+    res.status(503).json({
+      success: false,
+      database: 'error',
+      message: 'Falha ao conectar no banco de dados',
+      error: message,
+    });
+  }
 });
 
 router.use('/auth', authRoutes);
