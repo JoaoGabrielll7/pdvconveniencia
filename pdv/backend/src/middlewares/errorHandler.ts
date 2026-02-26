@@ -46,12 +46,24 @@ export function errorHandler(
     console.error('[API 500]', err);
   }
 
+  // Em produção: mensagens seguras de configuração podem ser mostradas para o usuário corrigir
+  const safeConfigMessages = [
+    'JWT_SECRET',
+    'DATABASE_URL',
+    'DIRECT_URL',
+    'Environment variable not found',
+    'nao definido',
+    'not defined',
+  ];
+  const errMessage = err instanceof Error ? err.message : String(err);
+  const isSafeConfigError = safeConfigMessages.some((s) => errMessage.includes(s));
+
   const message =
     env.nodeEnv === 'production'
-      ? 'Erro interno do servidor'
-      : err instanceof Error
-        ? err.message
-        : 'Erro desconhecido';
+      ? isSafeConfigError
+        ? errMessage
+        : 'Erro interno do servidor'
+      : errMessage;
 
   const response: ErrorResponse = {
     success: false,
