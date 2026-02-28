@@ -550,6 +550,16 @@
   border-top: 1px solid rgba(165, 183, 214, 0.28);
 }
 
+.license-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.4rem 1rem;
+}
+
+.license-admin-grid p {
+  margin: 0;
+}
+
 .user-menu-wrap {
   position: relative;
 }

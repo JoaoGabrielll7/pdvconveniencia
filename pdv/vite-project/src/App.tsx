@@ -19,7 +19,7 @@ import { faChartColumn, faCartShopping, faMoneyBillWave, faBoxOpen, faList, faUs
 import { faHashtag, faPhone, faEnvelope, faLock, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons'
 
 // Sessao: tipos principais da aplicacao.
-type ViewKey = 'dashboard' | 'venda' | 'caixa' | 'clientes' | 'produtos' | 'baixo-estoque' | 'usuarios' | 'fornecedores' | 'historico' | 'impressoras' | 'backup' | 'perfil';
+type ViewKey = 'dashboard' | 'venda' | 'caixa' | 'clientes' | 'produtos' | 'baixo-estoque' | 'usuarios' | 'fornecedores' | 'historico' | 'impressoras' | 'backup' | 'licenca' | 'perfil';
 type ApiResponse<T> = { success: boolean; data: T; message?: string; code?: string };
 type User = { id: string; email: string; nome: string; role: string };
 type Produto = { id: string; nome: string; codigo: string | null; preco: number | string; estoque: number };
@@ -572,7 +572,7 @@ function App() {
   const canAccessSystemSettings = isAdmin;
   const allowedViewsForCurrentRole = useMemo<ViewKey[]>(() => {
     if (isAdmin) {
-      return ['dashboard', 'venda', 'caixa', 'clientes', 'produtos', 'baixo-estoque', 'usuarios', 'fornecedores', 'historico', 'impressoras', 'backup', 'perfil'];
+      return ['dashboard', 'venda', 'caixa', 'clientes', 'produtos', 'baixo-estoque', 'usuarios', 'fornecedores', 'historico', 'impressoras', 'backup', 'licenca', 'perfil'];
     }
     if (isCaixa) {
       return ['dashboard', 'venda', 'caixa', 'produtos', 'baixo-estoque', 'historico', 'perfil'];
@@ -2299,6 +2299,7 @@ function App() {
       historico: 'Histórico de Vendas',
       impressoras: 'Impressoras',
       backup: 'Backup',
+      licenca: 'Licença local',
       perfil: 'Meu perfil',
     }[v];
   }
@@ -2307,7 +2308,7 @@ function App() {
     if (role !== 'ADMIN' && preferredView === 'dashboard') return 'venda';
     const roleAllowed: ViewKey[] =
       role === 'ADMIN'
-        ? ['dashboard', 'venda', 'caixa', 'clientes', 'produtos', 'baixo-estoque', 'usuarios', 'fornecedores', 'historico', 'impressoras', 'backup', 'perfil']
+        ? ['dashboard', 'venda', 'caixa', 'clientes', 'produtos', 'baixo-estoque', 'usuarios', 'fornecedores', 'historico', 'impressoras', 'backup', 'licenca', 'perfil']
         : role === 'CAIXA'
           ? ['dashboard', 'venda', 'caixa', 'produtos', 'baixo-estoque', 'historico', 'perfil']
           : ['dashboard', 'venda', 'caixa', 'historico', 'perfil'];
@@ -3132,6 +3133,10 @@ function App() {
                   <button type="button" className={`nav-item sub ${view === 'backup' ? 'active' : ''}`} onClick={() => setView('backup')}>
                     <span className="nav-icon"><FontAwesomeIcon icon={faClockRotateLeft} /></span>
                     <span className="nav-label">Backup</span>
+                  </button>
+                  <button type="button" className={`nav-item sub ${view === 'licenca' ? 'active' : ''}`} onClick={() => setView('licenca')}>
+                    <span className="nav-icon"><FontAwesomeIcon icon={faLock} /></span>
+                    <span className="nav-label">Licença local</span>
                   </button>
                 </>
               )}
@@ -4094,6 +4099,62 @@ function App() {
                     ))}
                   </div>
                 )}
+              </section>
+            )}
+            {view === 'licenca' && (
+              <section className="panel config-panel">
+                <h2>Licença local</h2>
+                <p>Controle local de bloqueio e renovação. Validade padrão: 40 dias.</p>
+                {!localLicenseStatus ? (
+                  <p>Sem status disponível no momento.</p>
+                ) : (
+                  <div className="license-admin-grid">
+                    <p><strong>Status:</strong> {localLicenseStatus.bloqueado ? 'Bloqueada' : 'Ativa'}</p>
+                    <p><strong>Dias restantes:</strong> {localLicenseStatus.diasRestantes}</p>
+                    <p><strong>Data de ativação:</strong> {new Date(localLicenseStatus.dataAtivacao).toLocaleString('pt-BR')}</p>
+                    <p><strong>Data de expiração:</strong> {new Date(localLicenseStatus.dataExpiracao).toLocaleString('pt-BR')}</p>
+                    <p><strong>Última renovação:</strong> {localLicenseStatus.ultimaRenovacao ? new Date(localLicenseStatus.ultimaRenovacao).toLocaleString('pt-BR') : 'Nunca'}</p>
+                    <p><strong>Tentativas inválidas:</strong> {localLicenseStatus.tentativasBloqueio}</p>
+                  </div>
+                )}
+
+                <hr className="config-divider" />
+                <h3>Renovar licença</h3>
+                <label>Senha de renovação</label>
+                <input
+                  type="password"
+                  value={localLicenseRenewPassword}
+                  onChange={(event) => setLocalLicenseRenewPassword(event.target.value)}
+                  placeholder="Digite a senha de renovação"
+                />
+                <div className="actions-row">
+                  <button type="button" onClick={() => void renewLocalLicense()} disabled={localLicenseRenewLoading || localLicenseLoading}>
+                    {localLicenseRenewLoading ? 'Renovando...' : 'Renovar por mais 40 dias'}
+                  </button>
+                  <button type="button" onClick={() => void loadLocalLicenseStatus(false)} disabled={localLicenseLoading}>
+                    {localLicenseLoading ? 'Atualizando...' : 'Atualizar status'}
+                  </button>
+                </div>
+
+                <hr className="config-divider" />
+                <h3>Alterar senha de renovação</h3>
+                <label>Senha atual</label>
+                <input
+                  type="password"
+                  value={localLicenseCurrentPassword}
+                  onChange={(event) => setLocalLicenseCurrentPassword(event.target.value)}
+                />
+                <label>Nova senha</label>
+                <input
+                  type="password"
+                  value={localLicenseNewPassword}
+                  onChange={(event) => setLocalLicenseNewPassword(event.target.value)}
+                />
+                <div className="actions-row">
+                  <button type="button" onClick={() => void changeLocalLicensePassword()} disabled={localLicensePasswordLoading}>
+                    {localLicensePasswordLoading ? 'Atualizando...' : 'Salvar nova senha'}
+                  </button>
+                </div>
               </section>
             )}
           </main>
