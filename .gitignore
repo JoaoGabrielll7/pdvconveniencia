@@ -1,0 +1,16 @@
+# Dependências
+node_modules/
+
+# Ambiente
+.env
+!.env.example
+
+# Build e cache
+dist/
+.vite/
+*.tsbuildinfo
+
+# Logs e OS
+*.log
+.DS_Store
+Thumbs.db

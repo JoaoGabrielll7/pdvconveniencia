@@ -1,0 +1,7 @@
+{
+  "name": "pdvconveniencia",
+  "private": true,
+  "scripts": {
+    "build": "cd pdv/vite-project && npm ci && npm run build && cd ../backend && npm ci && npm run build"
+  }
+}
