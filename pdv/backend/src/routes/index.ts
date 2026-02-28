@@ -9,6 +9,7 @@ import { vendaRoutes } from './venda.routes';
 import { caixaRoutes } from './caixa.routes';
 import { systemRoutes } from './system.routes';
 import { licenseRoutes } from './license.routes';
+import { localLicenseRoutes } from './local-license.routes';
 
 const router = Router();
 
@@ -49,6 +50,7 @@ router.get('/health/db', async (_req, res) => {
   }
 });
 
+router.use('/local-license', localLicenseRoutes);
 router.use('/auth', authRoutes);
 router.use('/categorias', categoriaRoutes);
 router.use('/produtos', produtoRoutes);

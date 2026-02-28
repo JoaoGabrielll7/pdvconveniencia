@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { env } from './config/env';
 import { routes } from './routes';
 import { errorHandler } from './middlewares/errorHandler';
+import { localLicenseGuard } from './middlewares/local-license.guard';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -106,7 +107,7 @@ const apiRateLimit = rateLimit({
   },
 });
 
-app.use('/api', apiRateLimit, routes);
+app.use('/api', apiRateLimit, localLicenseGuard, routes);
 app.use(errorHandler);
 
 export { app };

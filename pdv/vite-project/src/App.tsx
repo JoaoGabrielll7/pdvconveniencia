@@ -20,7 +20,7 @@ import { faHashtag, faPhone, faEnvelope, faLock, faEye, faEyeSlash } from '@fort
 
 // Sessao: tipos principais da aplicacao.
 type ViewKey = 'dashboard' | 'venda' | 'caixa' | 'clientes' | 'produtos' | 'baixo-estoque' | 'usuarios' | 'fornecedores' | 'historico' | 'impressoras' | 'backup' | 'perfil';
-type ApiResponse<T> = { success: boolean; data: T; message?: string };
+type ApiResponse<T> = { success: boolean; data: T; message?: string; code?: string };
 type User = { id: string; email: string; nome: string; role: string };
 type Produto = { id: string; nome: string; codigo: string | null; preco: number | string; estoque: number };
 type ProdutoListResponse = { dados: Produto[] };
@@ -142,6 +142,20 @@ type ProfileMetadata = {
   documento: string;
   tipoPessoa: 'PF' | 'PJ';
 };
+type LocalLicenseStatus = {
+  id: string;
+  ativo: boolean;
+  bloqueado: boolean;
+  diasRestantes: number;
+  aviso: boolean;
+  dataAtivacao: string;
+  dataExpiracao: string;
+  ultimaRenovacao: string | null;
+  tentativasBloqueio: number;
+  ultimoBloqueioEm: string | null;
+  validadeDias: number;
+  avisoDias: number;
+};
 
 // Sessao: utilitarios globais de formato, data e persistencia local.
 const normalizeApiBase = (raw?: string): string => {
@@ -199,6 +213,7 @@ const BACKUP_STORAGE_KEY = 'pdv_backups';
 const DEFAULT_BACKUP_FOLDER_NAME = 'PDV-Backups-Local';
 const ACCOUNT_SETTINGS_KEY = 'pdv_account_settings';
 const PROFILE_META_KEY = 'pdv_profile_meta';
+const LOCAL_LICENSE_BLOCKED_EVENT = 'pdv:local-license-blocked';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
   startView: 'dashboard',
@@ -308,6 +323,12 @@ async function parseApiResponse<T>(res: Response): Promise<ApiResponse<T>> {
 // Sessao: cliente HTTP com fallback automatico para /api.
 async function requestApi<T>(path: string, init?: RequestInit): Promise<{ res: Response; json: ApiResponse<T> }> {
   const endpoint = path.startsWith('/') ? path : `/${path}`;
+  const notifyLocalLicenseBlocked = (res: Response, json: ApiResponse<T>): void => {
+    if (typeof window === 'undefined') return;
+    if (res.status !== 423 || json.code !== 'LOCAL_LICENSE_BLOCKED') return;
+    const detail = (json.data && typeof json.data === 'object') ? (json.data as LocalLicenseStatus) : null;
+    window.dispatchEvent(new CustomEvent<LocalLicenseStatus | null>(LOCAL_LICENSE_BLOCKED_EVENT, { detail }));
+  };
   let primaryRes: Response;
   try {
     primaryRes = await fetch(`${apiBase}${endpoint}`, init);
@@ -315,12 +336,14 @@ async function requestApi<T>(path: string, init?: RequestInit): Promise<{ res: R
     if (apiBase !== apiFallbackBase) {
       const fallbackRes = await fetch(`${apiFallbackBase}${endpoint}`, init);
       const fallbackJson = await parseApiResponse<T>(fallbackRes);
+      notifyLocalLicenseBlocked(fallbackRes, fallbackJson);
       return { res: fallbackRes, json: fallbackJson };
     }
     throw new Error('Não foi possível conectar à API. Verifique se o backend está rodando.');
   }
   try {
     const primaryJson = await parseApiResponse<T>(primaryRes);
+    notifyLocalLicenseBlocked(primaryRes, primaryJson);
     return { res: primaryRes, json: primaryJson };
   } catch (error) {
     if (error instanceof Error && error.message.includes('Resposta HTML recebida da API')) {
@@ -329,6 +352,7 @@ async function requestApi<T>(path: string, init?: RequestInit): Promise<{ res: R
     if (apiBase !== apiFallbackBase) {
       const fallbackRes = await fetch(`${apiFallbackBase}${endpoint}`, init);
       const fallbackJson = await parseApiResponse<T>(fallbackRes);
+      notifyLocalLicenseBlocked(fallbackRes, fallbackJson);
       return { res: fallbackRes, json: fallbackJson };
     }
     throw error;
@@ -370,6 +394,13 @@ function App() {
   const [dashboardPeriod, setDashboardPeriod] = useState<'7d' | '30d' | 'mes' | 'ano'>('30d');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [localLicenseStatus, setLocalLicenseStatus] = useState<LocalLicenseStatus | null>(null);
+  const [localLicenseLoading, setLocalLicenseLoading] = useState(true);
+  const [localLicenseRenewPassword, setLocalLicenseRenewPassword] = useState('');
+  const [localLicenseRenewLoading, setLocalLicenseRenewLoading] = useState(false);
+  const [localLicenseCurrentPassword, setLocalLicenseCurrentPassword] = useState('');
+  const [localLicenseNewPassword, setLocalLicenseNewPassword] = useState('');
+  const [localLicensePasswordLoading, setLocalLicensePasswordLoading] = useState(false);
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [localBackupFolderName, setLocalBackupFolderName] = useState(DEFAULT_BACKUP_FOLDER_NAME);
   const [restoreBackupCandidates, setRestoreBackupCandidates] = useState<BackupData[]>([]);
@@ -527,6 +558,13 @@ function App() {
   const produtoPrecoSugeridoLabel = useMemo(() => moneyField(produtoPrecoSugeridoNumero), [produtoPrecoSugeridoNumero]);
   const produtoCustoUnidadeLabel = useMemo(() => moneyField(produtoCustoUnidadeNumero), [produtoCustoUnidadeNumero]);
   const produtoMargemReaisLabel = useMemo(() => moneyField(produtoMargemReaisNumero), [produtoMargemReaisNumero]);
+  const localLicenseBlocked = Boolean(localLicenseStatus?.bloqueado);
+  const localLicenseWarn = Boolean(localLicenseStatus?.aviso);
+  const localLicenseExpirationLabel = useMemo(() => {
+    if (!localLicenseStatus?.dataExpiracao) return '-';
+    const parsed = new Date(localLicenseStatus.dataExpiracao);
+    return Number.isNaN(parsed.getTime()) ? localLicenseStatus.dataExpiracao : parsed.toLocaleString('pt-BR');
+  }, [localLicenseStatus?.dataExpiracao]);
   const isAdmin = user?.role === 'ADMIN';
   const isCaixa = user?.role === 'CAIXA';
   const canManageProducts = isAdmin;
@@ -1083,6 +1121,37 @@ function App() {
     setMenuOpen(!accountSettings.collapsedMenu);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const syncStatus = async (silent: boolean): Promise<void> => {
+      const latest = await loadLocalLicenseStatus(silent);
+      if (!active) return;
+      if (latest?.bloqueado) {
+        setStatus('Licença local expirada. Renove para continuar usando o sistema.');
+      }
+      setLocalLicenseLoading(false);
+    };
+
+    void syncStatus(false);
+    const intervalId = window.setInterval(() => {
+      void syncStatus(true);
+    }, 60_000);
+
+    const onBlocked = (event: Event): void => {
+      const detail = (event as CustomEvent<LocalLicenseStatus | null>).detail;
+      if (detail) setLocalLicenseStatus(detail);
+      setLocalLicenseLoading(false);
+      setStatus('Licença local expirada. Renove para continuar usando o sistema.');
+    };
+    window.addEventListener(LOCAL_LICENSE_BLOCKED_EVENT, onBlocked as EventListener);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener(LOCAL_LICENSE_BLOCKED_EVENT, onBlocked as EventListener);
+    };
+  }, []);
+
   useEffect(() => saveJson('pdv_produtos', produtos), [produtos]);
   useEffect(() => saveJson('pdv_vendas', vendas), [vendas]);
   useEffect(() => saveJson('pdv_cash_entries', cashEntries), [cashEntries]);
@@ -1232,6 +1301,91 @@ function App() {
   }, [view, token, searchVenda]);
 
   // Sessao: leitura de dados do backend.
+  async function loadLocalLicenseStatus(silent = false): Promise<LocalLicenseStatus | null> {
+    try {
+      const { res, json } = await requestApi<LocalLicenseStatus>('/local-license/status', { cache: 'no-store' });
+      if (!res.ok || !json.success) {
+        if (!silent) setError(json.message ?? 'Falha ao carregar status da licença local');
+        return null;
+      }
+      setLocalLicenseStatus(json.data);
+      return json.data;
+    } catch (err) {
+      if (!silent) {
+        setError(err instanceof Error ? err.message : 'Falha ao carregar status da licença local');
+      }
+      return null;
+    }
+  }
+
+  async function renewLocalLicense(): Promise<void> {
+    if (!localLicenseRenewPassword.trim()) {
+      setError('Informe a senha para renovar a licença');
+      return;
+    }
+    setLocalLicenseRenewLoading(true);
+    setError('');
+    try {
+      const { res, json } = await requestApi<LocalLicenseStatus>('/local-license/renew', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha: localLicenseRenewPassword.trim() }),
+      });
+      if (!res.ok || !json.success) throw new Error(json.message ?? 'Falha ao renovar licença');
+      setLocalLicenseStatus(json.data);
+      setLocalLicenseRenewPassword('');
+      setStatus(`Licença renovada até ${new Date(json.data.dataExpiracao).toLocaleString('pt-BR')}`);
+
+      if (token) {
+        const startTasks: Array<Promise<unknown>> = [loadProdutos(token, ''), loadVendas(token, true), loadCaixaData(token, true, caixaHistoricoFilters)];
+        if (user?.role === 'ADMIN') {
+          startTasks.push(loadUsuarios(token), loadFornecedores(token));
+        }
+        const [, , hasOpenCash] = await Promise.all(startTasks);
+        if (!hasOpenCash) setShowOpenCashModal(true);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao renovar licença');
+    } finally {
+      setLocalLicenseRenewLoading(false);
+    }
+  }
+
+  async function changeLocalLicensePassword(): Promise<void> {
+    if (!token || !isAdmin) return;
+    if (!localLicenseCurrentPassword.trim() || !localLicenseNewPassword.trim()) {
+      setError('Informe a senha atual e a nova senha de renovação');
+      return;
+    }
+    if (localLicenseNewPassword.trim().length < 4) {
+      setError('A nova senha de renovação deve ter ao menos 4 caracteres');
+      return;
+    }
+    setLocalLicensePasswordLoading(true);
+    setError('');
+    try {
+      const { res, json } = await requestApi<unknown>('/local-license/password', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          senhaAtual: localLicenseCurrentPassword.trim(),
+          novaSenha: localLicenseNewPassword.trim(),
+        }),
+      });
+      if (!res.ok || !json.success) throw new Error(json.message ?? 'Falha ao alterar senha de renovação');
+      setLocalLicenseCurrentPassword('');
+      setLocalLicenseNewPassword('');
+      setStatus('Senha de renovação da licença atualizada com sucesso');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao alterar senha de renovação');
+    } finally {
+      setLocalLicensePasswordLoading(false);
+    }
+  }
+
   async function loadProdutos(authToken: string, busca: string): Promise<void> {
     try {
       const query = new URLSearchParams({ page: '1', limit: '100' });
@@ -1416,6 +1570,8 @@ function App() {
       setView(resolveAccountStartView(json.data.user.role, accountSettings.startView));
       setHistoryPageSize(accountSettings.historyPageSize);
       setMenuOpen(!accountSettings.collapsedMenu);
+      const licenseStatus = await loadLocalLicenseStatus();
+      if (licenseStatus?.bloqueado) return;
       if (json.data.user.role !== 'ADMIN') {
         setUsuarios([]);
         setFornecedores([]);
@@ -2158,6 +2314,60 @@ function App() {
     return roleAllowed.includes(preferredView) ? preferredView : (role === 'ADMIN' ? 'dashboard' : 'venda');
   }
 
+  function renderLocalLicenseRenewContent(mode: 'login' | 'blocked') {
+    return (
+      <div className={`local-license-card ${mode === 'blocked' ? 'blocked' : 'login'}`}>
+        <h3>Licença local {localLicenseBlocked ? 'expirada' : 'em validação'}</h3>
+        <p>
+          {localLicenseLoading
+            ? 'Verificando status da licença...'
+            : localLicenseBlocked
+              ? `A licença expirou em ${localLicenseExpirationLabel}.`
+              : `Licença ativa com ${localLicenseStatus?.diasRestantes ?? 0} dia(s) restante(s).`}
+        </p>
+        <p className="local-license-tip">Validade padrão: 40 dias. Senha inicial: RENOVA2024 (altere após a instalação).</p>
+        <div className="local-license-grid">
+          <label>Senha de renovação</label>
+          <input
+            type="password"
+            value={localLicenseRenewPassword}
+            onChange={(event) => setLocalLicenseRenewPassword(event.target.value)}
+            placeholder="Digite a senha de renovação"
+          />
+          <button type="button" onClick={() => void renewLocalLicense()} disabled={localLicenseRenewLoading || localLicenseLoading}>
+            {localLicenseRenewLoading ? 'Renovando...' : 'Renovar licença'}
+          </button>
+        </div>
+        {isAdmin && token && (
+          <div className="local-license-grid local-license-password-grid">
+            <label>Senha atual da renovação</label>
+            <input
+              type="password"
+              value={localLicenseCurrentPassword}
+              onChange={(event) => setLocalLicenseCurrentPassword(event.target.value)}
+              placeholder="Senha atual"
+            />
+            <label>Nova senha de renovação</label>
+            <input
+              type="password"
+              value={localLicenseNewPassword}
+              onChange={(event) => setLocalLicenseNewPassword(event.target.value)}
+              placeholder="Nova senha"
+            />
+            <button type="button" onClick={() => void changeLocalLicensePassword()} disabled={localLicensePasswordLoading}>
+              {localLicensePasswordLoading ? 'Atualizando...' : 'Alterar senha de renovação'}
+            </button>
+          </div>
+        )}
+        {mode === 'blocked' && (
+          <div className="cash-modal-actions">
+            <button type="button" className="danger" onClick={logout}>Sair da conta</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function onProductsNavClick(): void {
     if (!menuOpen) {
       setView('produtos');
@@ -2315,6 +2525,9 @@ function App() {
     setFornecedores([]);
     setVendaCaixas([{ id: uid(), itens: [] }]);
     setActiveVendaCaixaIndex(0);
+    setLocalLicenseRenewPassword('');
+    setLocalLicenseCurrentPassword('');
+    setLocalLicenseNewPassword('');
     setShowLogoutModal(false);
     setShowUserMenu(false);
     setView('dashboard');
@@ -2880,6 +3093,11 @@ function App() {
             </div>
             <button type="submit" className="login-submit" disabled={loading}>{loading ? 'Entrando...' : 'Entrar'}</button>
           </form>
+          {localLicenseBlocked && (
+            <div className="local-license-login-wrap">
+              {renderLocalLicenseRenewContent('login')}
+            </div>
+          )}
           <small className="login-footer">JG.DEV - 2026</small>
         </section>
       ) : (
@@ -2925,6 +3143,13 @@ function App() {
             <header className="cash-topbar">
               <button type="button" className="menu-btn" onClick={() => setMenuOpen((current) => !current)}><FontAwesomeIcon icon={faBars} /></button>
               <div className="topbar-title">{titleForView(view)}</div>
+              {isAdmin && localLicenseStatus && (
+                <div className={`license-pill ${localLicenseWarn ? 'warning' : ''} ${localLicenseBlocked ? 'blocked' : ''}`}>
+                  {localLicenseBlocked
+                    ? 'Licença expirada'
+                    : `${localLicenseStatus.diasRestantes} dia(s) de licença`}
+                </div>
+              )}
               <div className="cash-controls">
                 <button type="button" className={`icon-square ${isFullscreen ? 'active' : ''}`} onClick={() => void toggleFullscreen()}><FontAwesomeIcon icon={isFullscreen ? faCompress : faExpand} /></button>
                 <div className="user-menu-wrap" ref={userMenuRef}>
@@ -4458,11 +4683,41 @@ function App() {
             <input type="password" value={currentSenha} onChange={(event) => setCurrentSenha(event.target.value)} />
             <label>Nova senha</label>
             <input type="password" value={newSenha} onChange={(event) => setNewSenha(event.target.value)} />
+            {isAdmin && (
+              <>
+                <hr className="config-divider" />
+                <p className="account-password-tip">Senha de renovação da licença local</p>
+                <label>Senha atual da renovação</label>
+                <input
+                  type="password"
+                  value={localLicenseCurrentPassword}
+                  onChange={(event) => setLocalLicenseCurrentPassword(event.target.value)}
+                />
+                <label>Nova senha de renovação</label>
+                <input
+                  type="password"
+                  value={localLicenseNewPassword}
+                  onChange={(event) => setLocalLicenseNewPassword(event.target.value)}
+                />
+                <div className="cash-modal-actions">
+                  <button type="button" onClick={() => void changeLocalLicensePassword()} disabled={localLicensePasswordLoading}>
+                    {localLicensePasswordLoading ? 'Atualizando...' : 'Alterar senha da licença'}
+                  </button>
+                </div>
+              </>
+            )}
 
             <div className="cash-modal-actions">
               <button type="button" onClick={() => setShowAccountModal(false)}>Cancelar</button>
               <button type="button" onClick={() => void saveAccountSettings()} disabled={loading}>Salvar</button>
             </div>
+          </div>
+        </div>
+      )}
+      {token && localLicenseBlocked && (
+        <div className="cash-modal-backdrop local-license-backdrop">
+          <div className="cash-modal local-license-modal">
+            {renderLocalLicenseRenewContent('blocked')}
           </div>
         </div>
       )}

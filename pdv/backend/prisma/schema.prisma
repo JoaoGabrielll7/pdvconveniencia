@@ -177,6 +177,21 @@ model LicenseHistory {
   @@index([action, createdAt])
 }
 
+model LocalLicense {
+  id                String   @id @default(uuid())
+  ativo             Boolean  @default(true)
+  dataAtivacao      DateTime
+  dataExpiracao     DateTime
+  ultimaRenovacao   DateTime?
+  senhaRenovacaoHash String
+  tentativasBloqueio Int     @default(0)
+  ultimoBloqueioEm  DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([ativo, dataExpiracao])
+}
+
 model Caixa {
   id                      String           @id @default(uuid())
   operadorId              String
