@@ -326,7 +326,7 @@ async function requestApi<T>(path: string, init?: RequestInit): Promise<{ res: R
   const notifyLocalLicenseBlocked = (res: Response, json: ApiResponse<T>): void => {
     if (typeof window === 'undefined') return;
     if (res.status !== 423 || json.code !== 'LOCAL_LICENSE_BLOCKED') return;
-    const detail = (json.data && typeof json.data === 'object') ? (json.data as LocalLicenseStatus) : null;
+    const detail = (json.data && typeof json.data === 'object') ? (json.data as unknown as LocalLicenseStatus) : null;
     window.dispatchEvent(new CustomEvent<LocalLicenseStatus | null>(LOCAL_LICENSE_BLOCKED_EVENT, { detail }));
   };
   let primaryRes: Response;
