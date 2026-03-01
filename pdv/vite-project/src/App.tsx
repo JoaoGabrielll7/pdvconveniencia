@@ -83,21 +83,6 @@ type FornecedorApi = {
   createdAt: string;
 };
 type FornecedorListResponse = { dados: FornecedorApi[]; total: number; page: number; totalPages: number };
-type SystemLog = {
-  id: string;
-  acao: string;
-  ip: string | null;
-  userAgent: string | null;
-  criadoEm: string;
-  user?: { id: string; nome: string; email: string; role: string } | null;
-};
-type SecurityCheckItem = { id: string; ok: boolean; message: string };
-type SecurityCheckData = {
-  ok: boolean;
-  checks: SecurityCheckItem[];
-  config: { nodeEnv: string; globalRateLimitPerMinute: number; sessionInactivityMinutes: number };
-};
-type ServerBackupFile = { fileName: string; createdAt: string; sizeBytes: number };
 type AccountStartView = 'dashboard' | 'venda' | 'caixa' | 'historico';
 type AccountSettings = {
   startView: AccountStartView;
@@ -155,6 +140,17 @@ type LocalLicenseStatus = {
   ultimoBloqueioEm: string | null;
   validadeDias: number;
   avisoDias: number;
+};
+type LicensePlanType = 'MONTHLY' | 'ANNUAL' | 'LIFETIME';
+type CreatedUserLicense = {
+  id: string;
+  licenseKey: string;
+  planType: LicensePlanType;
+  maxDevices: number;
+  status: string;
+  createdAt: string;
+  expiresAt: string | null;
+  user?: { id: string; nome: string; email: string; role: string } | null;
 };
 
 // Sessao: utilitarios globais de formato, data e persistencia local.
@@ -401,6 +397,12 @@ function App() {
   const [localLicenseCurrentPassword, setLocalLicenseCurrentPassword] = useState('');
   const [localLicenseNewPassword, setLocalLicenseNewPassword] = useState('');
   const [localLicensePasswordLoading, setLocalLicensePasswordLoading] = useState(false);
+  const [licenseUserId, setLicenseUserId] = useState('');
+  const [licensePlanType, setLicensePlanType] = useState<LicensePlanType>('MONTHLY');
+  const [licenseMaxDevices, setLicenseMaxDevices] = useState('1');
+  const [licenseValidityDays, setLicenseValidityDays] = useState('40');
+  const [licenseCreateLoading, setLicenseCreateLoading] = useState(false);
+  const [lastCreatedUserLicense, setLastCreatedUserLicense] = useState<CreatedUserLicense | null>(null);
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [localBackupFolderName, setLocalBackupFolderName] = useState(DEFAULT_BACKUP_FOLDER_NAME);
   const [restoreBackupCandidates, setRestoreBackupCandidates] = useState<BackupData[]>([]);
@@ -506,10 +508,6 @@ function App() {
   // Sessao: estado de preferncias de impressao e utilitarios da UI.
   const [printerName, setPrinterName] = useState('Impressora termica 80mm');
   const [autoPrint, setAutoPrint] = useState(true);
-  const [todaySystemLogs, setTodaySystemLogs] = useState<SystemLog[]>([]);
-  const [securityCheckData, setSecurityCheckData] = useState<SecurityCheckData | null>(null);
-  const [serverBackupFiles, setServerBackupFiles] = useState<ServerBackupFile[]>([]);
-  const [systemAdminLoading, setSystemAdminLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [editingProfileInfo, setEditingProfileInfo] = useState(false);
@@ -565,6 +563,10 @@ function App() {
     const parsed = new Date(localLicenseStatus.dataExpiracao);
     return Number.isNaN(parsed.getTime()) ? localLicenseStatus.dataExpiracao : parsed.toLocaleString('pt-BR');
   }, [localLicenseStatus?.dataExpiracao]);
+  const licenseUserOptions = useMemo(
+    () => [...usuarios].sort((a, b) => a.nome.localeCompare(b.nome)),
+    [usuarios]
+  );
   const isAdmin = user?.role === 'ADMIN';
   const isCaixa = user?.role === 'CAIXA';
   const canManageProducts = isAdmin;
@@ -1221,10 +1223,10 @@ function App() {
   }, [allowedViewsForCurrentRole, isAdmin, token, user, view]);
 
   useEffect(() => {
-    if (!token || !isAdmin || view !== 'backup') return;
-    setSystemAdminLoading(true);
-    void loadSystemAdminData(token).finally(() => setSystemAdminLoading(false));
-  }, [token, isAdmin, view]);
+    if (!token || !isAdmin || view !== 'licenca') return;
+    if (usuarios.length > 0) return;
+    void loadUsuarios(token);
+  }, [token, isAdmin, usuarios.length, view]);
 
   useEffect(() => {
     if (produtoPricingMode !== 'margem' || produtoCustoUnidadeNumero <= 0) return;
@@ -1383,6 +1385,50 @@ function App() {
       setError(err instanceof Error ? err.message : 'Falha ao alterar senha de renovação');
     } finally {
       setLocalLicensePasswordLoading(false);
+    }
+  }
+
+  async function createLicenseForUser(): Promise<void> {
+    if (!token || !isAdmin) return;
+    if (!licenseUserId) {
+      setError('Selecione um usuário para gerar a licença');
+      return;
+    }
+    const maxDevices = Math.max(1, Number(licenseMaxDevices) || 1);
+    const validityDays = Math.max(1, Number(licenseValidityDays) || 40);
+
+    setLicenseCreateLoading(true);
+    setError('');
+    try {
+      const payload: {
+        userId: string;
+        planType: LicensePlanType;
+        maxDevices: number;
+        validityDays?: number;
+      } = {
+        userId: licenseUserId,
+        planType: licensePlanType,
+        maxDevices,
+      };
+      if (licensePlanType !== 'LIFETIME') {
+        payload.validityDays = validityDays;
+      }
+
+      const { res, json } = await requestApi<CreatedUserLicense>('/licenses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok || !json.success) throw new Error(json.message ?? 'Falha ao gerar licença');
+      setLastCreatedUserLicense(json.data);
+      setStatus(`Licença gerada com sucesso: ${json.data.licenseKey}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao gerar licença');
+    } finally {
+      setLicenseCreateLoading(false);
     }
   }
 
@@ -2529,6 +2575,11 @@ function App() {
     setLocalLicenseRenewPassword('');
     setLocalLicenseCurrentPassword('');
     setLocalLicenseNewPassword('');
+    setLicenseUserId('');
+    setLicensePlanType('MONTHLY');
+    setLicenseMaxDevices('1');
+    setLicenseValidityDays('40');
+    setLastCreatedUserLicense(null);
     setShowLogoutModal(false);
     setShowUserMenu(false);
     setView('dashboard');
@@ -2580,25 +2631,6 @@ function App() {
     setError('');
   }
 
-  async function gerarBackupServidor(): Promise<void> {
-    if (!token || !isAdmin) return;
-    setSystemAdminLoading(true);
-    setError('');
-    try {
-      const { res, json } = await requestApi<{ fileName: string; createdAt: string }>('/system/backup/create', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok || !json.success) throw new Error(json.message ?? 'Falha ao gerar backup no servidor');
-      await loadSystemAdminData(token);
-      setStatus(`Backup do servidor criado: ${json.data.fileName}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao gerar backup do servidor');
-    } finally {
-      setSystemAdminLoading(false);
-    }
-  }
-
   function restaurarBackupLocal(backup: BackupData): void {
     if (!backup?.data) {
       setError('Backup inválido');
@@ -2631,66 +2663,6 @@ function App() {
     setRestoreBackupCandidates(sortedBackups);
     setShowRestoreBackupModal(true);
     setError('');
-  }
-
-  async function limparCacheServidor(): Promise<void> {
-    if (!token || !isAdmin) return;
-    setSystemAdminLoading(true);
-    setError('');
-    try {
-      const { res, json } = await requestApi<{ appCacheEntries: number }>('/system/cache/clear', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok || !json.success) throw new Error(json.message ?? 'Falha ao limpar cache');
-      setStatus(`Cache limpo com sucesso (${json.data.appCacheEntries} entradas em memória).`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao limpar cache');
-    } finally {
-      setSystemAdminLoading(false);
-    }
-  }
-
-  async function verificarSegurancaSistema(): Promise<void> {
-    if (!token || !isAdmin) return;
-    setSystemAdminLoading(true);
-    setError('');
-    try {
-      const { res, json } = await requestApi<SecurityCheckData>('/system/security/check', {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok || !json.success) throw new Error(json.message ?? 'Falha na verificação de segurança');
-      setSecurityCheckData(json.data);
-      setStatus(json.data.ok ? 'Verificação de segurança concluída: sem alertas críticos.' : 'Verificação concluída: existem alertas para revisar.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha na verificação de segurança');
-    } finally {
-      setSystemAdminLoading(false);
-    }
-  }
-
-  async function loadSystemAdminData(authToken: string): Promise<void> {
-    if (!isAdmin) return;
-    try {
-      const [logsPayload, backupsPayload, securityPayload] = await Promise.allSettled([
-        requestApi<{ data: SystemLog[] }>('/system/logs/today?limit=120', { headers: { Authorization: `Bearer ${authToken}` }, cache: 'no-store' }),
-        requestApi<ServerBackupFile[]>('/system/backup/files', { headers: { Authorization: `Bearer ${authToken}` }, cache: 'no-store' }),
-        requestApi<SecurityCheckData>('/system/security/check', { headers: { Authorization: `Bearer ${authToken}` }, cache: 'no-store' }),
-      ]);
-
-      if (logsPayload.status === 'fulfilled' && logsPayload.value.res.ok && logsPayload.value.json.success) {
-        setTodaySystemLogs(logsPayload.value.json.data.data ?? []);
-      }
-      if (backupsPayload.status === 'fulfilled' && backupsPayload.value.res.ok && backupsPayload.value.json.success) {
-        setServerBackupFiles(backupsPayload.value.json.data ?? []);
-      }
-      if (securityPayload.status === 'fulfilled' && securityPayload.value.res.ok && securityPayload.value.json.success) {
-        setSecurityCheckData(securityPayload.value.json.data);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao carregar dados administrativos do sistema');
-    }
   }
 
   function exportHistoricoExcel(): void {
@@ -4041,64 +4013,16 @@ function App() {
 
             {view === 'impressoras' && <section className="panel config-panel"><h2>Impressoras</h2><p>Configurações de impressão do caixa.</p><label>Nome da impressora</label><input value={printerName} onChange={(event) => setPrinterName(event.target.value)} /><label className="remember-line"><input type="checkbox" checked={autoPrint} onChange={(event) => setAutoPrint(event.target.checked)} /><span>Impressão automática após venda</span></label><div className="actions-row"><button type="button" onClick={() => setStatus('Teste de impressão enviado')}>Testar</button><button type="button" onClick={() => setStatus('Configuração salva')}>Salvar</button></div></section>}
             {view === 'backup' && (
-              /* Sessao: backup local e seguranca do sistema. */
+              /* Sessao: backup local do sistema. */
               <section className="panel config-panel">
-                <h2>Backup e Segurança</h2>
-                <p>Painel master para backup em pasta, cache e auditoria diária.</p>
+                <h2>Backup Local</h2>
+                <p>Painel para geração e restauração de backups locais.</p>
                 <p>Pasta do backup local: {localBackupFolderName}</p>
                 <p>Último backup local: {lastBackupAt ? new Date(lastBackupAt).toLocaleString('pt-BR') : 'Nenhum'}</p>
                 <div className="actions-row">
                   <button type="button" onClick={gerarBackupLocal}>Gerar backup local</button>
                   <button type="button" onClick={abrirTelaRestaurarBackup}>Restaurar backup local</button>
-                  <button type="button" onClick={() => void gerarBackupServidor()} disabled={!isAdmin || systemAdminLoading}>Gerar backup servidor</button>
-                  <button type="button" onClick={() => void limparCacheServidor()} disabled={!isAdmin || systemAdminLoading}>Limpar cache</button>
-                  <button type="button" onClick={() => void verificarSegurancaSistema()} disabled={!isAdmin || systemAdminLoading}>Verificar segurança</button>
                 </div>
-
-                <hr className="config-divider" />
-                <h3>Backups no servidor</h3>
-                {serverBackupFiles.length === 0 ? (
-                  <p>Nenhum arquivo de backup no servidor.</p>
-                ) : (
-                  <div className="table-body">
-                    {serverBackupFiles.slice(0, 8).map((item) => (
-                      <div key={item.fileName} className="table-row history-row">
-                        <span>{item.fileName}</span>
-                        <span>{new Date(item.createdAt).toLocaleString('pt-BR')}</span>
-                        <span>{(item.sizeBytes / 1024).toFixed(1)} KB</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <h3>Log diário</h3>
-                {todaySystemLogs.length === 0 ? (
-                  <p>Nenhum log registrado hoje.</p>
-                ) : (
-                  <div className="table-body">
-                    {todaySystemLogs.slice(0, 12).map((item) => (
-                      <div key={item.id} className="table-row history-row">
-                        <span>{new Date(item.criadoEm).toLocaleTimeString('pt-BR')}</span>
-                        <span>{item.user?.nome || 'Sistema'}</span>
-                        <span>{item.acao}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <h3>Status de segurança</h3>
-                {!securityCheckData ? (
-                  <p>Sem verificação recente.</p>
-                ) : (
-                  <div className="table-body">
-                    {securityCheckData.checks.map((item) => (
-                      <div key={item.id} className="table-row history-row">
-                        <span>{item.ok ? 'OK' : 'ALERTA'}</span>
-                        <span>{item.message}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </section>
             )}
             {view === 'licenca' && (
@@ -4155,6 +4079,70 @@ function App() {
                     {localLicensePasswordLoading ? 'Atualizando...' : 'Salvar nova senha'}
                   </button>
                 </div>
+
+                <hr className="config-divider" />
+                <h3>Gerar licença por usuário</h3>
+                <label>Usuário</label>
+                <select value={licenseUserId} onChange={(event) => setLicenseUserId(event.target.value)}>
+                  <option value="">Selecione um usuário</option>
+                  {licenseUserOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome} ({item.email})
+                    </option>
+                  ))}
+                </select>
+                <div className="license-generate-grid">
+                  <div>
+                    <label>Plano</label>
+                    <select value={licensePlanType} onChange={(event) => setLicensePlanType(event.target.value as LicensePlanType)}>
+                      <option value="MONTHLY">Mensal</option>
+                      <option value="ANNUAL">Anual</option>
+                      <option value="LIFETIME">Vitalício</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Máximo de dispositivos</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={licenseMaxDevices}
+                      onChange={(event) => setLicenseMaxDevices(event.target.value)}
+                    />
+                  </div>
+                  {licensePlanType !== 'LIFETIME' && (
+                    <div>
+                      <label>Dias de validade</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={3650}
+                        value={licenseValidityDays}
+                        onChange={(event) => setLicenseValidityDays(event.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="actions-row">
+                  <button type="button" onClick={() => { if (token) void loadUsuarios(token); }} disabled={licenseCreateLoading}>
+                    Atualizar usuários
+                  </button>
+                  <button type="button" onClick={() => void createLicenseForUser()} disabled={licenseCreateLoading}>
+                    {licenseCreateLoading ? 'Gerando...' : 'Gerar licença'}
+                  </button>
+                </div>
+                {lastCreatedUserLicense && (
+                  <div className="license-created-box">
+                    <p><strong>Chave gerada:</strong> {lastCreatedUserLicense.licenseKey}</p>
+                    <p><strong>Status:</strong> {lastCreatedUserLicense.status}</p>
+                    <p>
+                      <strong>Expira em:</strong>{' '}
+                      {lastCreatedUserLicense.expiresAt
+                        ? new Date(lastCreatedUserLicense.expiresAt).toLocaleString('pt-BR')
+                        : 'Sem expiração'}
+                    </p>
+                  </div>
+                )}
               </section>
             )}
           </main>
