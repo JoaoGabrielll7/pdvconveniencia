@@ -4026,123 +4026,150 @@ function App() {
               </section>
             )}
             {view === 'licenca' && (
-              <section className="panel config-panel">
-                <h2>Licença local</h2>
-                <p>Controle local de bloqueio e renovação. Validade padrão: 40 dias.</p>
-                {!localLicenseStatus ? (
-                  <p>Sem status disponível no momento.</p>
-                ) : (
-                  <div className="license-admin-grid">
-                    <p><strong>Status:</strong> {localLicenseStatus.bloqueado ? 'Bloqueada' : 'Ativa'}</p>
-                    <p><strong>Dias restantes:</strong> {localLicenseStatus.diasRestantes}</p>
-                    <p><strong>Data de ativação:</strong> {new Date(localLicenseStatus.dataAtivacao).toLocaleString('pt-BR')}</p>
-                    <p><strong>Data de expiração:</strong> {new Date(localLicenseStatus.dataExpiracao).toLocaleString('pt-BR')}</p>
-                    <p><strong>Última renovação:</strong> {localLicenseStatus.ultimaRenovacao ? new Date(localLicenseStatus.ultimaRenovacao).toLocaleString('pt-BR') : 'Nunca'}</p>
-                    <p><strong>Tentativas inválidas:</strong> {localLicenseStatus.tentativasBloqueio}</p>
+              <section className="panel config-panel license-panel">
+                <div className="license-panel-head">
+                  <div>
+                    <h2>Licença local</h2>
+                    <p>Controle local de bloqueio e renovação. Validade padrão: 40 dias.</p>
                   </div>
-                )}
-
-                <hr className="config-divider" />
-                <h3>Renovar licença</h3>
-                <label>Senha de renovação</label>
-                <input
-                  type="password"
-                  value={localLicenseRenewPassword}
-                  onChange={(event) => setLocalLicenseRenewPassword(event.target.value)}
-                  placeholder="Digite a senha de renovação"
-                />
-                <div className="actions-row">
-                  <button type="button" onClick={() => void renewLocalLicense()} disabled={localLicenseRenewLoading || localLicenseLoading}>
-                    {localLicenseRenewLoading ? 'Renovando...' : 'Renovar por mais 40 dias'}
-                  </button>
-                  <button type="button" onClick={() => void loadLocalLicenseStatus(false)} disabled={localLicenseLoading}>
+                  <button type="button" className="license-soft-btn" onClick={() => void loadLocalLicenseStatus(false)} disabled={localLicenseLoading}>
                     {localLicenseLoading ? 'Atualizando...' : 'Atualizar status'}
                   </button>
                 </div>
 
-                <hr className="config-divider" />
-                <h3>Alterar senha de renovação</h3>
-                <label>Senha atual</label>
-                <input
-                  type="password"
-                  value={localLicenseCurrentPassword}
-                  onChange={(event) => setLocalLicenseCurrentPassword(event.target.value)}
-                />
-                <label>Nova senha</label>
-                <input
-                  type="password"
-                  value={localLicenseNewPassword}
-                  onChange={(event) => setLocalLicenseNewPassword(event.target.value)}
-                />
-                <div className="actions-row">
-                  <button type="button" onClick={() => void changeLocalLicensePassword()} disabled={localLicensePasswordLoading}>
-                    {localLicensePasswordLoading ? 'Atualizando...' : 'Salvar nova senha'}
-                  </button>
-                </div>
-
-                <hr className="config-divider" />
-                <h3>Gerar licença por usuário</h3>
-                <label>Usuário</label>
-                <select value={licenseUserId} onChange={(event) => setLicenseUserId(event.target.value)}>
-                  <option value="">Selecione um usuário</option>
-                  {licenseUserOptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.nome} ({item.email})
-                    </option>
-                  ))}
-                </select>
-                <div className="license-generate-grid">
-                  <div>
-                    <label>Plano</label>
-                    <select value={licensePlanType} onChange={(event) => setLicensePlanType(event.target.value as LicensePlanType)}>
-                      <option value="MONTHLY">Mensal</option>
-                      <option value="ANNUAL">Anual</option>
-                      <option value="LIFETIME">Vitalício</option>
-                    </select>
+                {!localLicenseStatus ? (
+                  <div className="license-empty-state">
+                    <p>Sem status disponível no momento.</p>
                   </div>
-                  <div>
-                    <label>Máximo de dispositivos</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={licenseMaxDevices}
-                      onChange={(event) => setLicenseMaxDevices(event.target.value)}
-                    />
-                  </div>
-                  {licensePlanType !== 'LIFETIME' && (
-                    <div>
-                      <label>Dias de validade</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={3650}
-                        value={licenseValidityDays}
-                        onChange={(event) => setLicenseValidityDays(event.target.value)}
-                      />
-                    </div>
-                  )}
-                </div>
-                <div className="actions-row">
-                  <button type="button" onClick={() => { if (token) void loadUsuarios(token); }} disabled={licenseCreateLoading}>
-                    Atualizar usuários
-                  </button>
-                  <button type="button" onClick={() => void createLicenseForUser()} disabled={licenseCreateLoading}>
-                    {licenseCreateLoading ? 'Gerando...' : 'Gerar licença'}
-                  </button>
-                </div>
-                {lastCreatedUserLicense && (
-                  <div className="license-created-box">
-                    <p><strong>Chave gerada:</strong> {lastCreatedUserLicense.licenseKey}</p>
-                    <p><strong>Status:</strong> {lastCreatedUserLicense.status}</p>
-                    <p>
-                      <strong>Expira em:</strong>{' '}
-                      {lastCreatedUserLicense.expiresAt
-                        ? new Date(lastCreatedUserLicense.expiresAt).toLocaleString('pt-BR')
-                        : 'Sem expiração'}
-                    </p>
+                ) : (
+                  <div className="license-overview-grid">
+                    <article className={`license-kpi ${localLicenseStatus.bloqueado ? 'blocked' : 'active'}`}>
+                      <span>Status</span>
+                      <strong>{localLicenseStatus.bloqueado ? 'Bloqueada' : 'Ativa'}</strong>
+                    </article>
+                    <article className={`license-kpi ${localLicenseStatus.aviso ? 'warning' : ''}`}>
+                      <span>Dias restantes</span>
+                      <strong>{localLicenseStatus.diasRestantes}</strong>
+                    </article>
+                    <article className="license-kpi">
+                      <span>Expiração</span>
+                      <strong>{new Date(localLicenseStatus.dataExpiracao).toLocaleDateString('pt-BR')}</strong>
+                    </article>
+                    <article className="license-kpi">
+                      <span>Tentativas inválidas</span>
+                      <strong>{localLicenseStatus.tentativasBloqueio}</strong>
+                    </article>
                   </div>
                 )}
+
+                <div className="license-panel-grid">
+                  <article className="license-card">
+                    <h3>Renovar licença</h3>
+                    <p className="license-card-tip">Use a senha de renovação para liberar mais 40 dias.</p>
+                    <label>Senha de renovação</label>
+                    <input
+                      type="password"
+                      value={localLicenseRenewPassword}
+                      onChange={(event) => setLocalLicenseRenewPassword(event.target.value)}
+                      placeholder="Digite a senha de renovação"
+                    />
+                    <div className="actions-row license-actions">
+                      <button type="button" onClick={() => void renewLocalLicense()} disabled={localLicenseRenewLoading || localLicenseLoading}>
+                        {localLicenseRenewLoading ? 'Renovando...' : 'Renovar por mais 40 dias'}
+                      </button>
+                    </div>
+                  </article>
+
+                  <article className="license-card">
+                    <h3>Alterar senha de renovação</h3>
+                    <p className="license-card-tip">Recomendado após a primeira instalação.</p>
+                    <label>Senha atual</label>
+                    <input
+                      type="password"
+                      value={localLicenseCurrentPassword}
+                      onChange={(event) => setLocalLicenseCurrentPassword(event.target.value)}
+                      placeholder="Informe a senha atual"
+                    />
+                    <label>Nova senha</label>
+                    <input
+                      type="password"
+                      value={localLicenseNewPassword}
+                      onChange={(event) => setLocalLicenseNewPassword(event.target.value)}
+                      placeholder="Informe a nova senha"
+                    />
+                    <div className="actions-row license-actions">
+                      <button type="button" onClick={() => void changeLocalLicensePassword()} disabled={localLicensePasswordLoading}>
+                        {localLicensePasswordLoading ? 'Atualizando...' : 'Salvar nova senha'}
+                      </button>
+                    </div>
+                  </article>
+
+                  <article className="license-card license-card-wide">
+                    <h3>Gerar licença por usuário</h3>
+                    <p className="license-card-tip">Selecione um usuário para gerar uma chave de licença dedicada.</p>
+                    <label>Usuário</label>
+                    <select value={licenseUserId} onChange={(event) => setLicenseUserId(event.target.value)}>
+                      <option value="">Selecione um usuário</option>
+                      {licenseUserOptions.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.nome} ({item.email})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="license-generate-grid">
+                      <div>
+                        <label>Plano</label>
+                        <select value={licensePlanType} onChange={(event) => setLicensePlanType(event.target.value as LicensePlanType)}>
+                          <option value="MONTHLY">Mensal</option>
+                          <option value="ANNUAL">Anual</option>
+                          <option value="LIFETIME">Vitalício</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label>Máximo de dispositivos</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={licenseMaxDevices}
+                          onChange={(event) => setLicenseMaxDevices(event.target.value)}
+                        />
+                      </div>
+                      {licensePlanType !== 'LIFETIME' && (
+                        <div>
+                          <label>Dias de validade</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={3650}
+                            value={licenseValidityDays}
+                            onChange={(event) => setLicenseValidityDays(event.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div className="actions-row license-actions">
+                      <button type="button" className="license-soft-btn" onClick={() => { if (token) void loadUsuarios(token); }} disabled={licenseCreateLoading}>
+                        Atualizar usuários
+                      </button>
+                      <button type="button" onClick={() => void createLicenseForUser()} disabled={licenseCreateLoading}>
+                        {licenseCreateLoading ? 'Gerando...' : 'Gerar licença'}
+                      </button>
+                    </div>
+                    {lastCreatedUserLicense && (
+                      <div className="license-created-box">
+                        <p><strong>Chave gerada:</strong> {lastCreatedUserLicense.licenseKey}</p>
+                        <p><strong>Status:</strong> {lastCreatedUserLicense.status}</p>
+                        <p>
+                          <strong>Expira em:</strong>{' '}
+                          {lastCreatedUserLicense.expiresAt
+                            ? new Date(lastCreatedUserLicense.expiresAt).toLocaleString('pt-BR')
+                            : 'Sem expiração'}
+                        </p>
+                      </div>
+                    )}
+                  </article>
+                </div>
               </section>
             )}
           </main>

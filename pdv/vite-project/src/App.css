@@ -550,26 +550,159 @@
   border-top: 1px solid rgba(165, 183, 214, 0.28);
 }
 
-.license-admin-grid {
+.license-panel {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.4rem 1rem;
+  gap: 0.9rem;
 }
 
-.license-admin-grid p {
+.license-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.license-panel-head h2 {
   margin: 0;
+}
+
+.license-panel-head p {
+  margin: 0.35rem 0 0;
+}
+
+.license-soft-btn {
+  background: rgba(55, 95, 172, 0.35);
+  border: 1px solid #5d86cf;
+  color: #e9f2ff;
+}
+
+.license-empty-state {
+  border: 1px dashed #40639d;
+  border-radius: 0.65rem;
+  padding: 0.8rem 0.9rem;
+  background: rgba(24, 39, 69, 0.55);
+}
+
+.license-empty-state p {
+  margin: 0;
+}
+
+.license-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 0.55rem;
+}
+
+.license-kpi {
+  border: 1px solid #3f5f96;
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.7rem;
+  background: linear-gradient(180deg, rgba(25, 42, 74, 0.95), rgba(20, 35, 63, 0.95));
+  display: grid;
+  gap: 0.25rem;
+}
+
+.license-kpi span {
+  color: #aecaef;
+  font-size: 0.82rem;
+}
+
+.license-kpi strong {
+  color: #f2f6ff;
+  font-size: 1.02rem;
+}
+
+.license-kpi.active {
+  border-color: #2f9959;
+}
+
+.license-kpi.blocked {
+  border-color: #c95f5f;
+}
+
+.license-kpi.warning {
+  border-color: #d3a11a;
+}
+
+.license-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.license-card {
+  border: 1px solid #35578f;
+  border-radius: 0.7rem;
+  padding: 0.8rem;
+  background: linear-gradient(180deg, rgba(25, 41, 71, 0.94), rgba(19, 33, 58, 0.94));
+  display: grid;
+  gap: 0.45rem;
+}
+
+.license-card h3 {
+  margin: 0;
+}
+
+.license-card-tip {
+  margin: 0;
+  color: #aac4ec;
+  font-size: 0.84rem;
+}
+
+.license-card label {
+  display: block;
+  margin-top: 0.1rem;
+  color: #e7f0ff;
+  font-weight: 700;
+}
+
+.license-card input,
+.license-card select {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 0.6rem;
+  border: 1px solid #5a79b0;
+  background: #1a2d4c;
+  color: #edf4ff;
+  padding: 0.55rem 0.72rem;
+}
+
+.license-card select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23D6E6FF' d='M1.4 1.2a.9.9 0 0 1 1.2 0L6 4.6 9.4 1.2a.9.9 0 1 1 1.2 1.2L6.6 6.4a.9.9 0 0 1-1.2 0L1.4 2.4a.9.9 0 0 1 0-1.2z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 12px 8px;
+}
+
+.license-card input:focus,
+.license-card select:focus {
+  border-color: #7aa6f5;
+  box-shadow: 0 0 0 3px rgba(78, 125, 220, 0.2);
+  outline: none;
+}
+
+.license-actions {
+  margin-top: 0.25rem;
+}
+
+.license-card-wide {
+  grid-column: 1 / -1;
 }
 
 .license-generate-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
 }
 
 .license-created-box {
-  margin-top: 0.5rem;
+  margin-top: 0.35rem;
   padding: 0.65rem 0.75rem;
-  border-radius: 0.5rem;
+  border-radius: 0.55rem;
   border: 1px solid #3d5f97;
   background: rgba(29, 48, 84, 0.65);
 }
@@ -4466,5 +4599,36 @@
     width: 100%;
     margin: 0.2rem 0 0;
     text-align: center;
+  }
+
+  .license-panel-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .license-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .license-panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .license-generate-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .license-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .license-actions {
+    justify-content: stretch;
+  }
+
+  .license-actions button {
+    width: 100%;
   }
 }
