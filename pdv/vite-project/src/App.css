@@ -784,6 +784,57 @@
 
 .logs-filter-item {
   min-width: 0;
+  border: 1px solid #385481;
+  border-radius: 0.58rem;
+  padding: 0.42rem 0.45rem;
+  background: linear-gradient(180deg, rgba(26, 42, 71, 0.95), rgba(21, 35, 62, 0.95));
+}
+
+.logs-filter-item label {
+  color: #d6e5ff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.32rem;
+}
+
+.logs-filters-grid input,
+.logs-filters-grid select {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 0.48rem;
+  border: 1px solid #4f71aa;
+  background: #111f39;
+  color: #edf4ff;
+  padding: 0.5rem 0.7rem;
+  font-weight: 600;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.logs-filters-grid input::placeholder {
+  color: #89a8d6;
+}
+
+.logs-filters-grid input:focus,
+.logs-filters-grid select:focus {
+  outline: none;
+  border-color: #7aa8ff;
+  box-shadow: 0 0 0 3px rgba(76, 123, 218, 0.22);
+  background: #142546;
+}
+
+.logs-filters-grid select {
+  appearance: none;
+  padding-right: 2.45rem;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #a8c5f5 50%),
+    linear-gradient(135deg, #a8c5f5 50%, transparent 50%),
+    linear-gradient(to right, #2f4874, #2f4874);
+  background-position:
+    calc(100% - 16px) calc(1.05em + 2px),
+    calc(100% - 11px) calc(1.05em + 2px),
+    calc(100% - 2.1rem) 50%;
+  background-size: 5px 5px, 5px 5px, 1px 60%;
+  background-repeat: no-repeat;
 }
 
 .logs-search-item {
@@ -4330,6 +4381,40 @@
 .light-mode .logs-filters-grid {
   background: #F9FAFB;
   border-color: #E5E7EB;
+}
+
+.light-mode .logs-filter-item {
+  background: #FFFFFF;
+  border-color: #E5E7EB;
+}
+
+.light-mode .logs-filter-item label {
+  color: #4B5563;
+}
+
+.light-mode .logs-filters-grid input,
+.light-mode .logs-filters-grid select {
+  border-color: #D1D5DB;
+  background: #F9FAFB;
+  color: #111827;
+}
+
+.light-mode .logs-filters-grid input::placeholder {
+  color: #9CA3AF;
+}
+
+.light-mode .logs-filters-grid input:focus,
+.light-mode .logs-filters-grid select:focus {
+  border-color: #93C5FD;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+  background: #FFFFFF;
+}
+
+.light-mode .logs-filters-grid select {
+  background-image:
+    linear-gradient(45deg, transparent 50%, #6B7280 50%),
+    linear-gradient(135deg, #6B7280 50%, transparent 50%),
+    linear-gradient(to right, #E5E7EB, #E5E7EB);
 }
 
 .light-mode .logs-period,
