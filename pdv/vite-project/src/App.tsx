@@ -19,7 +19,7 @@ import { faChartColumn, faCartShopping, faMoneyBillWave, faBoxOpen, faList, faUs
 import { faHashtag, faPhone, faEnvelope, faLock, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons'
 
 // Sessao: tipos principais da aplicacao.
-type ViewKey = 'dashboard' | 'venda' | 'caixa' | 'clientes' | 'produtos' | 'baixo-estoque' | 'usuarios' | 'fornecedores' | 'historico' | 'impressoras' | 'backup' | 'licenca' | 'perfil';
+type ViewKey = 'dashboard' | 'venda' | 'caixa' | 'clientes' | 'produtos' | 'baixo-estoque' | 'usuarios' | 'fornecedores' | 'historico' | 'impressoras' | 'backup' | 'logs' | 'licenca' | 'perfil';
 type ApiResponse<T> = { success: boolean; data: T; message?: string; code?: string };
 type User = { id: string; email: string; nome: string; role: string };
 type Produto = { id: string; nome: string; codigo: string | null; preco: number | string; estoque: number };
@@ -151,6 +151,20 @@ type CreatedUserLicense = {
   createdAt: string;
   expiresAt: string | null;
   user?: { id: string; nome: string; email: string; role: string } | null;
+};
+type SystemLogUser = { id: string; nome: string; email: string; role: string };
+type SystemLogEntry = {
+  id: string;
+  userId: string | null;
+  acao: string;
+  ip: string | null;
+  userAgent: string | null;
+  criadoEm: string;
+  user?: SystemLogUser | null;
+};
+type SystemTodayLogsPayload = {
+  data: SystemLogEntry[];
+  periodo: { from: string; to: string };
 };
 
 // Sessao: utilitarios globais de formato, data e persistencia local.
@@ -425,6 +439,13 @@ function App() {
   const [localBackupFolderName, setLocalBackupFolderName] = useState(DEFAULT_BACKUP_FOLDER_NAME);
   const [restoreBackupCandidates, setRestoreBackupCandidates] = useState<BackupData[]>([]);
   const [showRestoreBackupModal, setShowRestoreBackupModal] = useState(false);
+  const [systemLogs, setSystemLogs] = useState<SystemLogEntry[]>([]);
+  const [systemLogsPeriod, setSystemLogsPeriod] = useState<{ from: string; to: string } | null>(null);
+  const [systemLogsLoading, setSystemLogsLoading] = useState(false);
+  const [systemLogsLimit, setSystemLogsLimit] = useState('120');
+  const [systemLogsSearch, setSystemLogsSearch] = useState('');
+  const [systemLogsActionFilter, setSystemLogsActionFilter] = useState('todos');
+  const [systemLogsUserFilter, setSystemLogsUserFilter] = useState('todos');
 
   // Sessao: estado operacional de produtos, vendas e caixas simultaneos.
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -592,13 +613,40 @@ function App() {
   const canAccessSystemSettings = isAdmin;
   const allowedViewsForCurrentRole = useMemo<ViewKey[]>(() => {
     if (isAdmin) {
-      return ['dashboard', 'venda', 'caixa', 'clientes', 'produtos', 'baixo-estoque', 'usuarios', 'fornecedores', 'historico', 'impressoras', 'backup', 'licenca', 'perfil'];
+      return ['dashboard', 'venda', 'caixa', 'clientes', 'produtos', 'baixo-estoque', 'usuarios', 'fornecedores', 'historico', 'impressoras', 'backup', 'logs', 'licenca', 'perfil'];
     }
     if (isCaixa) {
       return ['dashboard', 'venda', 'caixa', 'produtos', 'baixo-estoque', 'historico', 'perfil'];
     }
     return ['dashboard', 'venda', 'caixa', 'historico', 'perfil'];
   }, [isAdmin, isCaixa]);
+  const systemLogsActions = useMemo(
+    () => [...new Set(systemLogs.map((item) => item.acao).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [systemLogs]
+  );
+  const systemLogsUsers = useMemo(
+    () =>
+      [...new Map(systemLogs.map((item) => [item.user?.id ?? item.userId ?? 'sem-usuario', item.user?.nome ?? 'Sistema'])).entries()]
+        .map(([id, nome]) => ({ id, nome }))
+        .sort((a, b) => a.nome.localeCompare(b.nome)),
+    [systemLogs]
+  );
+  const filteredSystemLogs = useMemo(() => {
+    const term = systemLogsSearch.trim().toLowerCase();
+    return systemLogs.filter((item) => {
+      const userId = item.user?.id ?? item.userId ?? 'sem-usuario';
+      const userLabel = `${item.user?.nome ?? ''} ${item.user?.email ?? ''}`.toLowerCase();
+      const matchesAction = systemLogsActionFilter === 'todos' || item.acao === systemLogsActionFilter;
+      const matchesUser = systemLogsUserFilter === 'todos' || userId === systemLogsUserFilter;
+      const matchesSearch =
+        !term
+        || item.acao.toLowerCase().includes(term)
+        || (item.ip ?? '').toLowerCase().includes(term)
+        || (item.userAgent ?? '').toLowerCase().includes(term)
+        || userLabel.includes(term);
+      return matchesAction && matchesUser && matchesSearch;
+    });
+  }, [systemLogs, systemLogsActionFilter, systemLogsSearch, systemLogsUserFilter]);
   const subtotalVenda = totalCarrinho;
   const descontoVenda = useMemo(() => Math.max(0, moneyInput(saleDiscount)), [saleDiscount]);
   const totalFinalVenda = useMemo(() => Math.max(0, subtotalVenda - descontoVenda), [subtotalVenda, descontoVenda]);
@@ -1245,6 +1293,10 @@ function App() {
     if (usuarios.length > 0) return;
     void loadUsuarios(token);
   }, [token, isAdmin, usuarios.length, view]);
+  useEffect(() => {
+    if (!token || !isAdmin || view !== 'logs') return;
+    void loadSystemLogs(token);
+  }, [token, isAdmin, view]);
 
   useEffect(() => {
     if (produtoPricingMode !== 'margem' || produtoCustoUnidadeNumero <= 0) return;
@@ -1598,6 +1650,27 @@ function App() {
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao carregar fornecedores');
+    }
+  }
+
+  async function loadSystemLogs(authToken: string, customLimit?: number): Promise<void> {
+    const limit = Math.min(500, Math.max(1, Number(customLimit ?? systemLogsLimit) || 120));
+    setSystemLogsLoading(true);
+    setError('');
+    try {
+      const { res, json } = await requestApi<SystemTodayLogsPayload>(`/system/logs/today?limit=${limit}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+        cache: 'no-store',
+      });
+      if (!res.ok || !json.success) {
+        throw new Error(json.message ?? 'Falha ao carregar logs do sistema');
+      }
+      setSystemLogs(json.data.data);
+      setSystemLogsPeriod(json.data.periodo);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao carregar logs do sistema');
+    } finally {
+      setSystemLogsLoading(false);
     }
   }
 
@@ -2369,6 +2442,7 @@ function App() {
       historico: 'Histórico de Vendas',
       impressoras: 'Impressoras',
       backup: 'Backup',
+      logs: 'Logs do sistema',
       licenca: 'Licença local',
       perfil: 'Meu perfil',
     }[v];
@@ -2378,7 +2452,7 @@ function App() {
     if (role !== 'ADMIN' && preferredView === 'dashboard') return 'venda';
     const roleAllowed: ViewKey[] =
       role === 'ADMIN'
-        ? ['dashboard', 'venda', 'caixa', 'clientes', 'produtos', 'baixo-estoque', 'usuarios', 'fornecedores', 'historico', 'impressoras', 'backup', 'licenca', 'perfil']
+        ? ['dashboard', 'venda', 'caixa', 'clientes', 'produtos', 'baixo-estoque', 'usuarios', 'fornecedores', 'historico', 'impressoras', 'backup', 'logs', 'licenca', 'perfil']
         : role === 'CAIXA'
           ? ['dashboard', 'venda', 'caixa', 'produtos', 'baixo-estoque', 'historico', 'perfil']
           : ['dashboard', 'venda', 'caixa', 'historico', 'perfil'];
@@ -2604,6 +2678,12 @@ function App() {
     setLicenseMaxDevices('1');
     setLicenseValidityDays('40');
     setLastCreatedUserLicense(null);
+    setSystemLogs([]);
+    setSystemLogsPeriod(null);
+    setSystemLogsLimit('120');
+    setSystemLogsSearch('');
+    setSystemLogsActionFilter('todos');
+    setSystemLogsUserFilter('todos');
     setShowLogoutModal(false);
     setShowUserMenu(false);
     setView('dashboard');
@@ -3129,6 +3209,10 @@ function App() {
                   <button type="button" className={`nav-item sub ${view === 'backup' ? 'active' : ''}`} onClick={() => setView('backup')}>
                     <span className="nav-icon"><FontAwesomeIcon icon={faClockRotateLeft} /></span>
                     <span className="nav-label">Backup</span>
+                  </button>
+                  <button type="button" className={`nav-item sub ${view === 'logs' ? 'active' : ''}`} onClick={() => setView('logs')}>
+                    <span className="nav-icon"><FontAwesomeIcon icon={faList} /></span>
+                    <span className="nav-label">Logs do sistema</span>
                   </button>
                   <button type="button" className={`nav-item sub ${view === 'licenca' ? 'active' : ''}`} onClick={() => setView('licenca')}>
                     <span className="nav-icon"><FontAwesomeIcon icon={faLock} /></span>
@@ -4046,6 +4130,104 @@ function App() {
                 <div className="actions-row">
                   <button type="button" onClick={gerarBackupLocal}>Gerar backup local</button>
                   <button type="button" onClick={abrirTelaRestaurarBackup}>Restaurar backup local</button>
+                </div>
+              </section>
+            )}
+            {view === 'logs' && (
+              <section className="panel config-panel">
+                <div className="history-title-row">
+                  <h2>Logs do sistema</h2>
+                  <button
+                    type="button"
+                    className="history-refresh-btn"
+                    onClick={() => {
+                      if (token) void loadSystemLogs(token);
+                    }}
+                    disabled={systemLogsLoading}
+                  >
+                    {systemLogsLoading ? 'Atualizando...' : 'Atualizar'}
+                  </button>
+                </div>
+                <p>Auditoria das ações do dia atual (login, caixa, licença, backup e segurança).</p>
+                {systemLogsPeriod && (
+                  <p>
+                    Período: {new Date(systemLogsPeriod.from).toLocaleString('pt-BR')} até {new Date(systemLogsPeriod.to).toLocaleString('pt-BR')}
+                  </p>
+                )}
+
+                <div className="panel history-filters history-filters-v2">
+                  <div className="history-compact-controls">
+                    <div className="history-date-box">
+                      <label>Limite</label>
+                      <select value={systemLogsLimit} onChange={(event) => setSystemLogsLimit(event.target.value)}>
+                        <option value="50">50</option>
+                        <option value="120">120</option>
+                        <option value="250">250</option>
+                        <option value="500">500</option>
+                      </select>
+                    </div>
+                    <div className="history-date-box">
+                      <label>Usuário</label>
+                      <select value={systemLogsUserFilter} onChange={(event) => setSystemLogsUserFilter(event.target.value)}>
+                        <option value="todos">Todos</option>
+                        {systemLogsUsers.map((item) => (
+                          <option key={item.id} value={item.id}>{item.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="history-date-box">
+                      <label>Ação</label>
+                      <select value={systemLogsActionFilter} onChange={(event) => setSystemLogsActionFilter(event.target.value)}>
+                        <option value="todos">Todas</option>
+                        {systemLogsActions.map((item) => (
+                          <option key={item} value={item}>{item}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="history-date-box">
+                      <label>Buscar</label>
+                      <input
+                        value={systemLogsSearch}
+                        onChange={(event) => setSystemLogsSearch(event.target.value)}
+                        placeholder="Ação, IP, navegador ou usuário"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="history-refresh-btn"
+                      onClick={() => {
+                        if (token) void loadSystemLogs(token, Number(systemLogsLimit));
+                      }}
+                      disabled={systemLogsLoading}
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="panel history-table-panel">
+                  <div className="table-head history-head">
+                    <span>Data/Hora</span>
+                    <span>Usuário</span>
+                    <span>Ação</span>
+                    <span>IP</span>
+                    <span>Navegador</span>
+                  </div>
+                  <div className="table-body history-table-body">
+                    {filteredSystemLogs.length === 0 ? (
+                      <p className="empty-text">Nenhum log encontrado para os filtros selecionados.</p>
+                    ) : (
+                      filteredSystemLogs.map((item) => (
+                        <div className="table-row history-row" key={item.id}>
+                          <span>{new Date(item.criadoEm).toLocaleString('pt-BR')}</span>
+                          <span>{item.user?.nome ?? 'Sistema'}</span>
+                          <span>{item.acao}</span>
+                          <span>{item.ip || '-'}</span>
+                          <span>{item.userAgent || '-'}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </section>
             )}
