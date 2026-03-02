@@ -647,6 +647,23 @@ function App() {
       return matchesAction && matchesUser && matchesSearch;
     });
   }, [systemLogs, systemLogsActionFilter, systemLogsSearch, systemLogsUserFilter]);
+  const systemLogsStats = useMemo(() => {
+    const now = Date.now();
+    const oneHourAgo = now - 60 * 60 * 1000;
+    const failureRegex = /(FALHA|INVALID|BLOQUE|ERRO)/i;
+    const lastHour = systemLogs.filter((item) => {
+      const when = new Date(item.criadoEm).getTime();
+      return Number.isFinite(when) && when >= oneHourAgo;
+    }).length;
+    const failures = systemLogs.filter((item) => failureRegex.test(item.acao)).length;
+    const users = new Set(systemLogs.map((item) => item.user?.id ?? item.userId ?? '').filter(Boolean)).size;
+    return {
+      total: systemLogs.length,
+      users,
+      lastHour,
+      failures,
+    };
+  }, [systemLogs]);
   const subtotalVenda = totalCarrinho;
   const descontoVenda = useMemo(() => Math.max(0, moneyInput(saleDiscount)), [saleDiscount]);
   const totalFinalVenda = useMemo(() => Math.max(0, subtotalVenda - descontoVenda), [subtotalVenda, descontoVenda]);
@@ -4134,100 +4151,122 @@ function App() {
               </section>
             )}
             {view === 'logs' && (
-              <section className="panel config-panel">
-                <div className="history-title-row">
-                  <h2>Logs do sistema</h2>
+              <section className="panel config-panel logs-panel">
+                <div className="logs-head">
+                  <div>
+                    <h2>Logs do sistema</h2>
+                    <p>Auditoria das ações do dia atual (login, caixa, licença, backup e segurança).</p>
+                    {systemLogsPeriod && (
+                      <small className="logs-period">
+                        Período: {new Date(systemLogsPeriod.from).toLocaleString('pt-BR')} até {new Date(systemLogsPeriod.to).toLocaleString('pt-BR')}
+                      </small>
+                    )}
+                  </div>
                   <button
                     type="button"
-                    className="history-refresh-btn"
+                    className="history-refresh-btn logs-refresh-btn"
                     onClick={() => {
-                      if (token) void loadSystemLogs(token);
+                      if (token) void loadSystemLogs(token, Number(systemLogsLimit));
                     }}
                     disabled={systemLogsLoading}
                   >
-                    {systemLogsLoading ? 'Atualizando...' : 'Atualizar'}
+                    {systemLogsLoading ? 'Atualizando...' : 'Atualizar logs'}
                   </button>
                 </div>
-                <p>Auditoria das ações do dia atual (login, caixa, licença, backup e segurança).</p>
-                {systemLogsPeriod && (
-                  <p>
-                    Período: {new Date(systemLogsPeriod.from).toLocaleString('pt-BR')} até {new Date(systemLogsPeriod.to).toLocaleString('pt-BR')}
-                  </p>
-                )}
 
-                <div className="panel history-filters history-filters-v2">
-                  <div className="history-compact-controls">
-                    <div className="history-date-box">
-                      <label>Limite</label>
-                      <select value={systemLogsLimit} onChange={(event) => setSystemLogsLimit(event.target.value)}>
-                        <option value="50">50</option>
-                        <option value="120">120</option>
-                        <option value="250">250</option>
-                        <option value="500">500</option>
-                      </select>
-                    </div>
-                    <div className="history-date-box">
-                      <label>Usuário</label>
-                      <select value={systemLogsUserFilter} onChange={(event) => setSystemLogsUserFilter(event.target.value)}>
-                        <option value="todos">Todos</option>
-                        {systemLogsUsers.map((item) => (
-                          <option key={item.id} value={item.id}>{item.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="history-date-box">
-                      <label>Ação</label>
-                      <select value={systemLogsActionFilter} onChange={(event) => setSystemLogsActionFilter(event.target.value)}>
-                        <option value="todos">Todas</option>
-                        {systemLogsActions.map((item) => (
-                          <option key={item} value={item}>{item}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="history-date-box">
-                      <label>Buscar</label>
-                      <input
-                        value={systemLogsSearch}
-                        onChange={(event) => setSystemLogsSearch(event.target.value)}
-                        placeholder="Ação, IP, navegador ou usuário"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      className="history-refresh-btn"
-                      onClick={() => {
-                        if (token) void loadSystemLogs(token, Number(systemLogsLimit));
-                      }}
-                      disabled={systemLogsLoading}
-                    >
-                      Aplicar
-                    </button>
+                <div className="logs-kpi-grid">
+                  <article className="logs-kpi">
+                    <span>Total de eventos</span>
+                    <strong>{systemLogsStats.total}</strong>
+                  </article>
+                  <article className="logs-kpi">
+                    <span>Usuários envolvidos</span>
+                    <strong>{systemLogsStats.users}</strong>
+                  </article>
+                  <article className="logs-kpi">
+                    <span>Última hora</span>
+                    <strong>{systemLogsStats.lastHour}</strong>
+                  </article>
+                  <article className="logs-kpi danger">
+                    <span>Falhas/alertas</span>
+                    <strong>{systemLogsStats.failures}</strong>
+                  </article>
+                </div>
+
+                <div className="logs-filters-grid">
+                  <div className="history-date-box logs-filter-item">
+                    <label>Limite</label>
+                    <select value={systemLogsLimit} onChange={(event) => setSystemLogsLimit(event.target.value)}>
+                      <option value="50">50</option>
+                      <option value="120">120</option>
+                      <option value="250">250</option>
+                      <option value="500">500</option>
+                    </select>
+                  </div>
+                  <div className="history-date-box logs-filter-item">
+                    <label>Usuário</label>
+                    <select value={systemLogsUserFilter} onChange={(event) => setSystemLogsUserFilter(event.target.value)}>
+                      <option value="todos">Todos</option>
+                      {systemLogsUsers.map((item) => (
+                        <option key={item.id} value={item.id}>{item.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="history-date-box logs-filter-item">
+                    <label>Ação</label>
+                    <select value={systemLogsActionFilter} onChange={(event) => setSystemLogsActionFilter(event.target.value)}>
+                      <option value="todos">Todas</option>
+                      {systemLogsActions.map((item) => (
+                        <option key={item} value={item}>{item}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="history-date-box logs-filter-item logs-search-item">
+                    <label>Buscar</label>
+                    <input
+                      value={systemLogsSearch}
+                      onChange={(event) => setSystemLogsSearch(event.target.value)}
+                      placeholder="Ação, IP, navegador ou usuário"
+                    />
                   </div>
                 </div>
 
-                <div className="panel history-table-panel">
-                  <div className="table-head history-head">
+                <div className="panel history-table-panel logs-table-panel">
+                  <div className="table-head history-head logs-head-row">
                     <span>Data/Hora</span>
                     <span>Usuário</span>
                     <span>Ação</span>
                     <span>IP</span>
                     <span>Navegador</span>
                   </div>
-                  <div className="table-body history-table-body">
+                  <div className="table-body history-table-body logs-table-body">
                     {filteredSystemLogs.length === 0 ? (
                       <p className="empty-text">Nenhum log encontrado para os filtros selecionados.</p>
                     ) : (
                       filteredSystemLogs.map((item) => (
-                        <div className="table-row history-row" key={item.id}>
-                          <span>{new Date(item.criadoEm).toLocaleString('pt-BR')}</span>
-                          <span>{item.user?.nome ?? 'Sistema'}</span>
-                          <span>{item.acao}</span>
+                        <div className="table-row history-row logs-row" key={item.id}>
+                          <span className="logs-col-date">{new Date(item.criadoEm).toLocaleString('pt-BR')}</span>
+                          <span className="logs-col-user">
+                            <strong>{item.user?.nome ?? 'Sistema'}</strong>
+                            <small>{item.user?.email ?? item.userId ?? '-'}</small>
+                          </span>
+                          <span>
+                            <span className={`log-action-pill ${/(FALHA|INVALID|BLOQUE|ERRO)/i.test(item.acao) ? 'danger' : 'ok'}`}>
+                              {item.acao}
+                            </span>
+                          </span>
                           <span>{item.ip || '-'}</span>
-                          <span>{item.userAgent || '-'}</span>
+                          <span className="logs-col-agent" title={item.userAgent || '-'}>
+                            {item.userAgent || '-'}
+                          </span>
                         </div>
                       ))
                     )}
                   </div>
+                </div>
+
+                <div className="logs-footer">
+                  <span>Exibindo {filteredSystemLogs.length} de {systemLogs.length} registro(s).</span>
                 </div>
               </section>
             )}

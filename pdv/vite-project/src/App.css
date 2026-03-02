@@ -711,6 +711,156 @@
   margin: 0.2rem 0;
 }
 
+.logs-panel {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.logs-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.logs-head h2 {
+  margin: 0;
+}
+
+.logs-head p {
+  margin: 0.35rem 0 0.2rem;
+}
+
+.logs-period {
+  color: #a8c2ee;
+  font-size: 0.82rem;
+}
+
+.logs-refresh-btn {
+  white-space: nowrap;
+}
+
+.logs-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
+.logs-kpi {
+  border: 1px solid #3e6198;
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.75rem;
+  background: linear-gradient(180deg, rgba(31, 50, 84, 0.95), rgba(22, 37, 66, 0.95));
+  display: grid;
+  gap: 0.3rem;
+}
+
+.logs-kpi span {
+  color: #bad0f2;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.logs-kpi strong {
+  font-size: 1.45rem;
+  color: #eff5ff;
+  line-height: 1;
+}
+
+.logs-kpi.danger {
+  border-color: #94515c;
+  background: linear-gradient(180deg, rgba(94, 33, 46, 0.78), rgba(66, 24, 34, 0.78));
+}
+
+.logs-filters-grid {
+  border: 1px solid #2f456f;
+  border-radius: 0.65rem;
+  padding: 0.65rem;
+  background: #1a2741;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+}
+
+.logs-filter-item {
+  min-width: 0;
+}
+
+.logs-search-item {
+  grid-column: span 1;
+}
+
+.logs-table-panel {
+  margin: 0;
+}
+
+.logs-head-row,
+.logs-row {
+  grid-auto-flow: initial;
+  grid-auto-columns: initial;
+  grid-template-columns: 170px 220px minmax(170px, 1fr) 130px minmax(220px, 1.4fr);
+}
+
+.logs-col-date {
+  font-variant-numeric: tabular-nums;
+}
+
+.logs-col-user {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.logs-col-user strong {
+  color: #eef4ff;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.logs-col-user small {
+  color: #9fb6df;
+  font-size: 0.74rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-action-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid #3e6eb4;
+  background: rgba(45, 90, 160, 0.35);
+  color: #e7f0ff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  letter-spacing: 0.02em;
+}
+
+.log-action-pill.danger {
+  border-color: #bf6e7b;
+  background: rgba(160, 47, 70, 0.36);
+  color: #ffe2e8;
+}
+
+.log-action-pill.ok {
+  border-color: #5a8ad0;
+}
+
+.logs-col-agent {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logs-footer {
+  display: flex;
+  justify-content: flex-end;
+  color: #adc3e8;
+  font-size: 0.82rem;
+}
+
 .user-menu-wrap {
   position: relative;
 }
@@ -4159,6 +4309,51 @@
   background: #F3F4F6;
 }
 
+.light-mode .logs-kpi {
+  background: #FFFFFF;
+  border-color: #E5E7EB;
+}
+
+.light-mode .logs-kpi span {
+  color: #6B7280;
+}
+
+.light-mode .logs-kpi strong {
+  color: #111827;
+}
+
+.light-mode .logs-kpi.danger {
+  background: #FEF2F2;
+  border-color: #FECACA;
+}
+
+.light-mode .logs-filters-grid {
+  background: #F9FAFB;
+  border-color: #E5E7EB;
+}
+
+.light-mode .logs-period,
+.light-mode .logs-footer,
+.light-mode .logs-col-user small {
+  color: #6B7280;
+}
+
+.light-mode .logs-col-user strong {
+  color: #1F2937;
+}
+
+.light-mode .log-action-pill {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+  color: #1D4ED8;
+}
+
+.light-mode .log-action-pill.danger {
+  background: #FEE2E2;
+  border-color: #FCA5A5;
+  color: #B91C1C;
+}
+
 .light-mode .menu-btn,
 .light-mode .icon-square,
 .light-mode .user-chip,
@@ -4660,6 +4855,24 @@
   .license-generate-grid {
     grid-template-columns: 1fr;
   }
+
+  .logs-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .logs-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .logs-filters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .logs-head-row,
+  .logs-row {
+    grid-template-columns: 145px 170px minmax(150px, 1fr) 115px minmax(160px, 1.2fr);
+  }
 }
 
 @media (max-width: 640px) {
@@ -4673,5 +4886,20 @@
 
   .license-actions button {
     width: 100%;
+  }
+
+  .logs-kpi-grid,
+  .logs-filters-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .logs-head-row,
+  .logs-row {
+    grid-template-columns: 115px 120px minmax(120px, 1fr) 85px minmax(140px, 1fr);
+  }
+
+  .log-action-pill {
+    font-size: 0.68rem;
+    padding: 0.18rem 0.4rem;
   }
 }
