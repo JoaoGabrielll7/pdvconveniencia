@@ -2657,6 +2657,49 @@
   font-weight: 700;
 }
 
+.percent-input-wrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.percent-input-wrap input {
+  text-align: right;
+  font-weight: 700;
+}
+
+.percent-adjust-btn {
+  min-width: 56px;
+  height: 44px;
+  border: 1px solid #5a79b0;
+  border-radius: 0.5rem;
+  background: #223b64;
+  color: #edf5ff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0 0.45rem;
+}
+
+.percent-adjust-btn:hover:not(:disabled) {
+  transform: none;
+  border-color: #78a9ff;
+  box-shadow: 0 0 0 3px rgba(78, 125, 220, 0.2);
+}
+
+.percent-badge {
+  min-width: 34px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px solid #5a79b0;
+  background: #1a2d4c;
+  color: #cfe1ff;
+  font-weight: 700;
+}
+
 .product-select-add {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -179,15 +179,33 @@ const formatMoneyInput = (value: string): string => {
   return moneyField(amount);
 };
 const percentInput = (value: string): number => {
-  let normalized = value.replace(/\s/g, '').replace('%', '');
-  if (normalized.includes(',')) {
-    normalized = normalized.replace(/\./g, '').replace(',', '.');
-  }
-  normalized = normalized.replace(/[^\d.-]/g, '');
+  const normalized = value
+    .replace(/\s/g, '')
+    .replace('%', '')
+    .replace(',', '.')
+    .replace(/[^\d.]/g, '');
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 };
-const formatPercentInput = (value: string): string => moneyField(percentInput(value));
+const formatPercentField = (value: number): string => {
+  const safe = Math.max(0, Math.min(9999, value));
+  const fixed = safe.toFixed(2);
+  return fixed.replace(/\.00$/, '').replace(/(\.\d*[1-9])0$/, '$1');
+};
+const sanitizePercentFieldInput = (value: string): string => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  let next = trimmed.replace(',', '.').replace(/[^\d.]/g, '');
+  const firstDot = next.indexOf('.');
+  if (firstDot >= 0) {
+    next = `${next.slice(0, firstDot + 1)}${next.slice(firstDot + 1).replace(/\./g, '')}`;
+  }
+  const [intPart, decPart = ''] = next.split('.');
+  const normalized = decPart.length > 0 ? `${intPart}.${decPart.slice(0, 2)}` : intPart;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return '';
+  return formatPercentField(parsed);
+};
 const normalizeSearchText = (value: string): string =>
   value
     .normalize('NFD')
@@ -488,7 +506,7 @@ function App() {
   const [produtoPreco, setProdutoPreco] = useState('R$ 0,00');
   const [produtoPrecoFardo, setProdutoPrecoFardo] = useState('0,00');
   const [produtoQtdFardo, setProdutoQtdFardo] = useState('5');
-  const [produtoMargemManual, setProdutoMargemManual] = useState('50,00');
+  const [produtoMargemManual, setProdutoMargemManual] = useState('50');
   const [produtoPricingMode, setProdutoPricingMode] = useState<'margem' | 'preco'>('margem');
   const [produtoEstoque, setProdutoEstoque] = useState('0');
   const [produtoEstoqueMinimo, setProdutoEstoqueMinimo] = useState('1');
@@ -1669,12 +1687,18 @@ function App() {
     const precoVenda = moneyInput(formatted);
     setProdutoPricingMode('preco');
     setProdutoPreco(formatted);
-    setProdutoMargemManual(moneyField(calcularMargemPct(precoVenda, produtoCustoUnidadeNumero)));
+    setProdutoMargemManual(formatPercentField(calcularMargemPct(precoVenda, produtoCustoUnidadeNumero)));
   }
 
   function handleProdutoMargemManualChange(value: string): void {
     setProdutoPricingMode('margem');
-    setProdutoMargemManual(formatPercentInput(value));
+    setProdutoMargemManual(sanitizePercentFieldInput(value));
+  }
+
+  function ajustarProdutoMargem(delta: number): void {
+    setProdutoPricingMode('margem');
+    const atual = percentInput(produtoMargemManual);
+    setProdutoMargemManual(formatPercentField(atual + delta));
   }
 
   function resetProdutoFormFields(): void {
@@ -1683,7 +1707,7 @@ function App() {
     setProdutoPreco('R$ 0,00');
     setProdutoPrecoFardo('0,00');
     setProdutoQtdFardo('5');
-    setProdutoMargemManual('50,00');
+    setProdutoMargemManual('50');
     setProdutoPricingMode('margem');
     setProdutoEstoque('0');
     setProdutoEstoqueMinimo('1');
@@ -1793,7 +1817,7 @@ function App() {
     setProdutoPreco(`R$ ${precoVenda.toFixed(2).replace('.', ',')}`);
     setProdutoPrecoFardo((precoVenda * 5).toFixed(2).replace('.', ','));
     setProdutoQtdFardo('5');
-    setProdutoMargemManual(moneyField(calcularMargemPct(precoVenda, custoUnitario)));
+    setProdutoMargemManual(formatPercentField(calcularMargemPct(precoVenda, custoUnitario)));
     setProdutoPricingMode('preco');
     setProdutoEstoque(String(produto.estoque));
     setProdutoEstoqueMinimo('1');
@@ -4063,47 +4087,6 @@ function App() {
                 )}
 
                 <div className="license-panel-grid">
-                  <article className="license-card">
-                    <h3>Renovar licença</h3>
-                    <p className="license-card-tip">Use a senha de renovação para liberar mais 40 dias.</p>
-                    <label>Senha de renovação</label>
-                    <input
-                      type="password"
-                      value={localLicenseRenewPassword}
-                      onChange={(event) => setLocalLicenseRenewPassword(event.target.value)}
-                      placeholder="Digite a senha de renovação"
-                    />
-                    <div className="actions-row license-actions">
-                      <button type="button" onClick={() => void renewLocalLicense()} disabled={localLicenseRenewLoading || localLicenseLoading}>
-                        {localLicenseRenewLoading ? 'Renovando...' : 'Renovar por mais 40 dias'}
-                      </button>
-                    </div>
-                  </article>
-
-                  <article className="license-card">
-                    <h3>Alterar senha de renovação</h3>
-                    <p className="license-card-tip">Recomendado após a primeira instalação.</p>
-                    <label>Senha atual</label>
-                    <input
-                      type="password"
-                      value={localLicenseCurrentPassword}
-                      onChange={(event) => setLocalLicenseCurrentPassword(event.target.value)}
-                      placeholder="Informe a senha atual"
-                    />
-                    <label>Nova senha</label>
-                    <input
-                      type="password"
-                      value={localLicenseNewPassword}
-                      onChange={(event) => setLocalLicenseNewPassword(event.target.value)}
-                      placeholder="Informe a nova senha"
-                    />
-                    <div className="actions-row license-actions">
-                      <button type="button" onClick={() => void changeLocalLicensePassword()} disabled={localLicensePasswordLoading}>
-                        {localLicensePasswordLoading ? 'Atualizando...' : 'Salvar nova senha'}
-                      </button>
-                    </div>
-                  </article>
-
                   <article className="license-card license-card-wide">
                     <h3>Gerar licença por usuário</h3>
                     <p className="license-card-tip">Selecione um usuário para gerar uma chave de licença dedicada.</p>
@@ -4168,6 +4151,47 @@ function App() {
                         </p>
                       </div>
                     )}
+                  </article>
+
+                  <article className="license-card">
+                    <h3>Renovar licença</h3>
+                    <p className="license-card-tip">Use a senha de renovação para liberar mais 40 dias.</p>
+                    <label>Senha de renovação</label>
+                    <input
+                      type="password"
+                      value={localLicenseRenewPassword}
+                      onChange={(event) => setLocalLicenseRenewPassword(event.target.value)}
+                      placeholder="Digite a senha de renovação"
+                    />
+                    <div className="actions-row license-actions">
+                      <button type="button" onClick={() => void renewLocalLicense()} disabled={localLicenseRenewLoading || localLicenseLoading}>
+                        {localLicenseRenewLoading ? 'Renovando...' : 'Renovar por mais 40 dias'}
+                      </button>
+                    </div>
+                  </article>
+
+                  <article className="license-card">
+                    <h3>Alterar senha de renovação</h3>
+                    <p className="license-card-tip">Recomendado após a primeira instalação.</p>
+                    <label>Senha atual</label>
+                    <input
+                      type="password"
+                      value={localLicenseCurrentPassword}
+                      onChange={(event) => setLocalLicenseCurrentPassword(event.target.value)}
+                      placeholder="Informe a senha atual"
+                    />
+                    <label>Nova senha</label>
+                    <input
+                      type="password"
+                      value={localLicenseNewPassword}
+                      onChange={(event) => setLocalLicenseNewPassword(event.target.value)}
+                      placeholder="Informe a nova senha"
+                    />
+                    <div className="actions-row license-actions">
+                      <button type="button" onClick={() => void changeLocalLicensePassword()} disabled={localLicensePasswordLoading}>
+                        {localLicensePasswordLoading ? 'Atualizando...' : 'Salvar nova senha'}
+                      </button>
+                    </div>
                   </article>
                 </div>
               </section>
@@ -4287,7 +4311,17 @@ function App() {
                 </div>
                 <div>
                   <label>Margem de lucro (%)</label>
-                  <input value={produtoMargemManual} onChange={(event) => handleProdutoMargemManualChange(event.target.value)} inputMode="decimal" />
+                  <div className="percent-input-wrap">
+                    <button type="button" className="percent-adjust-btn" onClick={() => ajustarProdutoMargem(-5)}>-5%</button>
+                    <input
+                      value={produtoMargemManual}
+                      onChange={(event) => handleProdutoMargemManualChange(event.target.value)}
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                    <span className="percent-badge">%</span>
+                    <button type="button" className="percent-adjust-btn" onClick={() => ajustarProdutoMargem(5)}>+5%</button>
+                  </div>
                 </div>
                 <div>
                   <label>Estoque  *</label>
@@ -4390,7 +4424,17 @@ function App() {
                 </div>
                 <div>
                   <label>Margem de lucro (%)</label>
-                  <input value={produtoMargemManual} onChange={(event) => handleProdutoMargemManualChange(event.target.value)} inputMode="decimal" />
+                  <div className="percent-input-wrap">
+                    <button type="button" className="percent-adjust-btn" onClick={() => ajustarProdutoMargem(-5)}>-5%</button>
+                    <input
+                      value={produtoMargemManual}
+                      onChange={(event) => handleProdutoMargemManualChange(event.target.value)}
+                      inputMode="decimal"
+                      placeholder="0"
+                    />
+                    <span className="percent-badge">%</span>
+                    <button type="button" className="percent-adjust-btn" onClick={() => ajustarProdutoMargem(5)}>+5%</button>
+                  </div>
                 </div>
                 <div>
                   <label>Estoque  *</label>

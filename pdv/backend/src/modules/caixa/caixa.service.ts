@@ -82,19 +82,24 @@ export const caixaService = {
     const jaAberto = await getCaixaAberto(ctx.userId);
     if (jaAberto) throw new AppError(409, 'Ja existe caixa aberto para este operador', 'CAIXA_JA_ABERTO');
 
+    const aberturaComValor = input.valorInicial > 0;
     const caixa = await prisma.caixa.create({
       data: {
         operadorId: ctx.userId,
         valorInicial: d(input.valorInicial),
-        movimentos: {
-          create: {
-            operadorId: ctx.userId,
-            tipo: MovimentoTipo.ABERTURA,
-            valor: d(input.valorInicial),
-            formaPagamento: 'DINHEIRO',
-            descricao: input.descricao ?? 'Abertura de caixa',
-          },
-        },
+        ...(aberturaComValor
+          ? {
+              movimentos: {
+                create: {
+                  operadorId: ctx.userId,
+                  tipo: MovimentoTipo.ABERTURA,
+                  valor: d(input.valorInicial),
+                  formaPagamento: 'DINHEIRO',
+                  descricao: input.descricao ?? 'Abertura de caixa',
+                },
+              },
+            }
+          : {}),
       },
     });
     await logAudit(ctx, 'CAIXA_ABERTURA');
