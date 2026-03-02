@@ -9,6 +9,7 @@ const LOCAL_LICENSE_VALIDITY_DAYS = 40;
 const LOCAL_LICENSE_WARNING_DAYS = 7;
 const DEFAULT_RENEWAL_PASSWORD = 'RENOVA2024';
 const DAY_MS = 24 * 60 * 60 * 1000;
+const LOCAL_LICENSE_FALLBACK_ID = 'local-license-compat';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -22,6 +23,50 @@ function daysRemainingUntil(expiration: Date, now = new Date()): number {
   const diffMs = expiration.getTime() - now.getTime();
   if (diffMs <= 0) return 0;
   return Math.ceil(diffMs / DAY_MS);
+}
+
+function hasLocalLicenseReference(value: string): boolean {
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes('locallicense')
+    || normalized.includes('local_license')
+    || normalized.includes('local license')
+  );
+}
+
+function isLocalLicenseStorageError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const payload = error as { code?: unknown; message?: unknown; meta?: unknown };
+  const code = typeof payload.code === 'string' ? payload.code : '';
+  if (code !== 'P2021' && code !== 'P2022') return false;
+
+  const message = typeof payload.message === 'string' ? payload.message : '';
+  if (hasLocalLicenseReference(message)) return true;
+
+  if (payload.meta && typeof payload.meta === 'object') {
+    const metaText = JSON.stringify(payload.meta);
+    return hasLocalLicenseReference(metaText);
+  }
+  return false;
+}
+
+function compatibilityStatus() {
+  const now = new Date();
+  const exp = addDays(now, LOCAL_LICENSE_VALIDITY_DAYS);
+  return {
+    id: LOCAL_LICENSE_FALLBACK_ID,
+    ativo: true,
+    bloqueado: false,
+    diasRestantes: LOCAL_LICENSE_VALIDITY_DAYS,
+    aviso: false,
+    dataAtivacao: now.toISOString(),
+    dataExpiracao: exp.toISOString(),
+    ultimaRenovacao: null,
+    tentativasBloqueio: 0,
+    ultimoBloqueioEm: null,
+    validadeDias: LOCAL_LICENSE_VALIDITY_DAYS,
+    avisoDias: LOCAL_LICENSE_WARNING_DAYS,
+  };
 }
 
 async function audit(ctx: Ctx, acao: string): Promise<void> {
@@ -64,6 +109,21 @@ async function ensureSingleActiveLicense() {
   return active[0];
 }
 
+async function ensureSingleActiveLicenseForWrite() {
+  try {
+    return await ensureSingleActiveLicense();
+  } catch (error) {
+    if (isLocalLicenseStorageError(error)) {
+      throw new AppError(
+        503,
+        'Modulo de licenca local indisponivel no banco de dados. Atualize a estrutura e tente novamente.',
+        'LOCAL_LICENSE_STORAGE_UNAVAILABLE',
+      );
+    }
+    throw error;
+  }
+}
+
 function toPublicStatus(license: {
   id: string;
   ativo: boolean;
@@ -94,12 +154,20 @@ function toPublicStatus(license: {
 
 export const localLicenseService = {
   async status() {
-    const license = await ensureSingleActiveLicense();
-    return toPublicStatus(license);
+    try {
+      const license = await ensureSingleActiveLicense();
+      return toPublicStatus(license);
+    } catch (error) {
+      if (isLocalLicenseStorageError(error)) {
+        console.warn('[local-license] tabela/coluna de licenca local indisponivel, usando modo compatibilidade');
+        return compatibilityStatus();
+      }
+      throw error;
+    }
   },
 
   async renew(input: RenewLocalLicenseInput, ctx: Ctx = {}) {
-    const license = await ensureSingleActiveLicense();
+    const license = await ensureSingleActiveLicenseForWrite();
     const providedHash = sha256(input.senha.trim());
 
     if (!input.senha.trim() || providedHash !== license.senhaRenovacaoHash) {
@@ -129,7 +197,7 @@ export const localLicenseService = {
   },
 
   async changePassword(input: ChangeLocalLicensePasswordInput, ctx: Ctx) {
-    const license = await ensureSingleActiveLicense();
+    const license = await ensureSingleActiveLicenseForWrite();
     const currentHash = sha256(input.senhaAtual.trim());
     if (!input.senhaAtual.trim() || currentHash !== license.senhaRenovacaoHash) {
       await audit(ctx, 'LOCAL_LICENSE_PASSWORD_CHANGE_INVALID_CURRENT');

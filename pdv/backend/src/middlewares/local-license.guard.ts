@@ -35,6 +35,8 @@ export async function localLicenseGuard(req: Request, res: Response, next: NextF
     }
     next();
   } catch (error) {
-    next(error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[local-license-guard] fallback liberado por erro de verificacao de licenca local:', message);
+    next();
   }
 }
