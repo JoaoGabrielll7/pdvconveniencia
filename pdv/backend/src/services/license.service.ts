@@ -188,11 +188,23 @@ export const licenseService = {
   },
 
   async block(id: string, actor?: Actor) {
-    await ensureLicenseExists(id);
+    const current = await ensureLicenseExists(id);
     return prisma.$transaction(async (tx) => {
       const updated = await tx.license.update({
         where: { id },
         data: { status: LicenseStatus.BLOCKED },
+      });
+      await tx.user.update({
+        where: { id: current.userId },
+        data: { ativo: false },
+      });
+      await tx.refreshToken.updateMany({
+        where: { userId: current.userId, revogado: false },
+        data: {
+          revogado: true,
+          revogadoEm: new Date(),
+          revogadoMotivo: 'USER_BLOCKED_BY_LICENSE',
+        },
       });
       await tx.licenseHistory.create({
         data: {
@@ -214,6 +226,10 @@ export const licenseService = {
       const updated = await tx.license.update({
         where: { id },
         data: { status: LicenseStatus.ACTIVE },
+      });
+      await tx.user.update({
+        where: { id: current.userId },
+        data: { ativo: true },
       });
       await tx.licenseHistory.create({
         data: {
