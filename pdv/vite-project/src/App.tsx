@@ -152,6 +152,12 @@ type CreatedUserLicense = {
   expiresAt: string | null;
   user?: { id: string; nome: string; email: string; role: string } | null;
 };
+type LicenseListResponse = {
+  items: CreatedUserLicense[];
+  total: number;
+  limit: number;
+  offset: number;
+};
 type SystemLogUser = { id: string; nome: string; email: string; role: string };
 type SystemLogEntry = {
   id: string;
@@ -433,8 +439,12 @@ function App() {
   const [licensePlanType, setLicensePlanType] = useState<LicensePlanType>('MONTHLY');
   const [licenseMaxDevices, setLicenseMaxDevices] = useState('1');
   const [licenseValidityDays, setLicenseValidityDays] = useState('40');
+  const [licenseAddDaysInput, setLicenseAddDaysInput] = useState('40');
   const [licenseCreateLoading, setLicenseCreateLoading] = useState(false);
+  const [licenseActionLoading, setLicenseActionLoading] = useState(false);
+  const [selectedUserLicenseLoading, setSelectedUserLicenseLoading] = useState(false);
   const [lastCreatedUserLicense, setLastCreatedUserLicense] = useState<CreatedUserLicense | null>(null);
+  const [selectedUserLicense, setSelectedUserLicense] = useState<CreatedUserLicense | null>(null);
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [localBackupFolderName, setLocalBackupFolderName] = useState(DEFAULT_BACKUP_FOLDER_NAME);
   const [restoreBackupCandidates, setRestoreBackupCandidates] = useState<BackupData[]>([]);
@@ -1311,6 +1321,14 @@ function App() {
     void loadUsuarios(token);
   }, [token, isAdmin, usuarios.length, view]);
   useEffect(() => {
+    if (!token || !isAdmin || view !== 'licenca') return;
+    if (!licenseUserId) {
+      setSelectedUserLicense(null);
+      return;
+    }
+    void loadUserCurrentLicense(token, licenseUserId);
+  }, [token, isAdmin, view, licenseUserId]);
+  useEffect(() => {
     if (!token || !isAdmin || view !== 'logs') return;
     void loadSystemLogs(token);
   }, [token, isAdmin, view]);
@@ -1475,6 +1493,32 @@ function App() {
     }
   }
 
+  async function loadUserCurrentLicense(authToken: string, targetUserId: string): Promise<void> {
+    setSelectedUserLicenseLoading(true);
+    setError('');
+    try {
+      const query = new URLSearchParams({
+        user: targetUserId,
+        limit: '20',
+        offset: '0',
+      });
+      const { res, json } = await requestApi<LicenseListResponse>(`/licenses?${query.toString()}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+        cache: 'no-store',
+      });
+      if (!res.ok || !json.success) {
+        throw new Error(json.message ?? 'Falha ao carregar licença do usuário');
+      }
+      const exact = json.data.items.find((item) => item.user?.id === targetUserId) ?? null;
+      setSelectedUserLicense(exact);
+    } catch (err) {
+      setSelectedUserLicense(null);
+      setError(err instanceof Error ? err.message : 'Falha ao carregar licença do usuário');
+    } finally {
+      setSelectedUserLicenseLoading(false);
+    }
+  }
+
   async function createLicenseForUser(): Promise<void> {
     if (!token || !isAdmin) return;
     if (!licenseUserId) {
@@ -1511,11 +1555,73 @@ function App() {
       });
       if (!res.ok || !json.success) throw new Error(json.message ?? 'Falha ao gerar licença');
       setLastCreatedUserLicense(json.data);
+      setSelectedUserLicense(json.data);
       setStatus(`Licença gerada com sucesso: ${json.data.licenseKey}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao gerar licença');
     } finally {
       setLicenseCreateLoading(false);
+    }
+  }
+
+  async function blockSelectedUserLicense(): Promise<void> {
+    if (!token || !isAdmin) return;
+    if (!selectedUserLicense) {
+      setError('Nenhuma licença selecionada para bloquear');
+      return;
+    }
+    if (selectedUserLicense.status === 'BLOCKED') {
+      setStatus('A licença deste usuário já está bloqueada');
+      return;
+    }
+    setLicenseActionLoading(true);
+    setError('');
+    try {
+      const { res, json } = await requestApi<CreatedUserLicense>(`/licenses/${selectedUserLicense.id}/block`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok || !json.success) throw new Error(json.message ?? 'Falha ao bloquear licença');
+      setSelectedUserLicense(json.data);
+      if (lastCreatedUserLicense?.id === json.data.id) setLastCreatedUserLicense(json.data);
+      setStatus('Acesso do usuário bloqueado com sucesso');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao bloquear licença');
+    } finally {
+      setLicenseActionLoading(false);
+    }
+  }
+
+  async function addDaysToSelectedUserLicense(): Promise<void> {
+    if (!token || !isAdmin) return;
+    if (!selectedUserLicense) {
+      setError('Nenhuma licença selecionada para adicionar dias');
+      return;
+    }
+    const days = Math.max(1, Number(licenseAddDaysInput) || 0);
+    if (days <= 0) {
+      setError('Informe um número válido de dias');
+      return;
+    }
+    setLicenseActionLoading(true);
+    setError('');
+    try {
+      const { res, json } = await requestApi<CreatedUserLicense>(`/licenses/${selectedUserLicense.id}/add-days`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ days }),
+      });
+      if (!res.ok || !json.success) throw new Error(json.message ?? 'Falha ao adicionar dias da licença');
+      setSelectedUserLicense(json.data);
+      if (lastCreatedUserLicense?.id === json.data.id) setLastCreatedUserLicense(json.data);
+      setStatus(`${days} dia(s) adicionados na licença do usuário`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao adicionar dias da licença');
+    } finally {
+      setLicenseActionLoading(false);
     }
   }
 
@@ -2446,6 +2552,13 @@ function App() {
   }
 
   // Sessao: utilitarios de navegacao e ferramentas de interface.
+  function formatLicenseStatusLabel(status: string): string {
+    if (status === 'ACTIVE') return 'Ativa';
+    if (status === 'BLOCKED') return 'Bloqueada';
+    if (status === 'EXPIRED') return 'Expirada';
+    return status;
+  }
+
   function titleForView(v: ViewKey): string {
     return {
       dashboard: 'Dashboard',
@@ -2694,7 +2807,9 @@ function App() {
     setLicensePlanType('MONTHLY');
     setLicenseMaxDevices('1');
     setLicenseValidityDays('40');
+    setLicenseAddDaysInput('40');
     setLastCreatedUserLicense(null);
+    setSelectedUserLicense(null);
     setSystemLogs([]);
     setSystemLogsPeriod(null);
     setSystemLogsLimit('120');
@@ -4312,7 +4427,13 @@ function App() {
                     <h3>Gerar licença por usuário</h3>
                     <p className="license-card-tip">Selecione um usuário para gerar uma chave de licença dedicada.</p>
                     <label>Usuário</label>
-                    <select value={licenseUserId} onChange={(event) => setLicenseUserId(event.target.value)}>
+                    <select
+                      value={licenseUserId}
+                      onChange={(event) => {
+                        setLicenseUserId(event.target.value);
+                        setSelectedUserLicense(null);
+                      }}
+                    >
                       <option value="">Selecione um usuário</option>
                       {licenseUserOptions.map((item) => (
                         <option key={item.id} value={item.id}>
@@ -4363,13 +4484,63 @@ function App() {
                     {lastCreatedUserLicense && (
                       <div className="license-created-box">
                         <p><strong>Chave gerada:</strong> {lastCreatedUserLicense.licenseKey}</p>
-                        <p><strong>Status:</strong> {lastCreatedUserLicense.status}</p>
+                        <p><strong>Status:</strong> {formatLicenseStatusLabel(lastCreatedUserLicense.status)}</p>
                         <p>
                           <strong>Expira em:</strong>{' '}
                           {lastCreatedUserLicense.expiresAt
                             ? new Date(lastCreatedUserLicense.expiresAt).toLocaleString('pt-BR')
                             : 'Sem expiração'}
                         </p>
+                      </div>
+                    )}
+                    {licenseUserId && (
+                      <div className="license-created-box">
+                        <p><strong>Licença atual do usuário selecionado</strong></p>
+                        {selectedUserLicenseLoading ? (
+                          <p>Carregando licença do usuário...</p>
+                        ) : !selectedUserLicense ? (
+                          <p>Nenhuma licença encontrada para este usuário.</p>
+                        ) : (
+                          <>
+                            <p><strong>Chave:</strong> {selectedUserLicense.licenseKey}</p>
+                            <p><strong>Status:</strong> {formatLicenseStatusLabel(selectedUserLicense.status)}</p>
+                            <p>
+                              <strong>Expira em:</strong>{' '}
+                              {selectedUserLicense.expiresAt
+                                ? new Date(selectedUserLicense.expiresAt).toLocaleString('pt-BR')
+                                : 'Sem expiração'}
+                            </p>
+                            <div className="license-generate-grid">
+                              <div>
+                                <label>Adicionar dias</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={3650}
+                                  value={licenseAddDaysInput}
+                                  onChange={(event) => setLicenseAddDaysInput(event.target.value)}
+                                />
+                              </div>
+                            </div>
+                            <div className="actions-row license-actions">
+                              <button
+                                type="button"
+                                onClick={() => void blockSelectedUserLicense()}
+                                disabled={licenseActionLoading || selectedUserLicense.status === 'BLOCKED'}
+                              >
+                                {selectedUserLicense.status === 'BLOCKED' ? 'Acesso já bloqueado' : 'Bloquear acesso do usuário'}
+                              </button>
+                              <button
+                                type="button"
+                                className="license-soft-btn"
+                                onClick={() => void addDaysToSelectedUserLicense()}
+                                disabled={licenseActionLoading}
+                              >
+                                {licenseActionLoading ? 'Aplicando...' : 'Adicionar dias'}
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </article>
